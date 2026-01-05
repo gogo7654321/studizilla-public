@@ -1,0 +1,156 @@
+
+.digitalReviewBox {
+  @apply bg-[#f0f3f5] text-[#333] font-['Helvetica',_'Arial',_sans-serif] w-full h-screen rounded-2xl overflow-hidden;
+}
+.digitalReview {
+  @apply h-full flex flex-col;
+}
+.digitalReview__header {
+  @apply flex justify-between items-center p-2.5 bg-white shadow-sm;
+}
+.digitalReview__titleGroup {
+  @apply flex items-center;
+}
+.digitalReview__moduleSelect {
+  @apply flex items-center bg-transparent border-none cursor-pointer;
+}
+.digitalReview__title {
+  @apply text-lg font-bold;
+}
+.digitalReview__moduleSelectIcon {
+  @apply ml-1;
+}
+.digitalReview__directionsButton {
+  @apply ml-4 text-sm bg-transparent border-none cursor-pointer hidden;
+}
+.digitalReview__timerGroup {
+  @apply text-center;
+}
+.digitalReview__timer {
+  @apply font-mono text-xl font-bold;
+}
+.digitalReview__timerText {
+  @apply text-xs text-muted-foreground;
+}
+.digitalReview__actionGroup {
+  @apply flex items-center;
+}
+.digitalReview__action {
+  @apply flex items-center bg-transparent border-none cursor-pointer p-2 rounded hover:bg-secondary;
+}
+.digitalReview__actionIcon {
+  @apply mr-1.5 h-5 w-5;
+}
+.digitalReview__actionText {
+  @apply text-sm;
+}
+.digitalReview__dottedLine {
+  @apply border-t border-dashed border-gray-300;
+}
+.digitalReview__test-single {
+    @apply flex-1 flex flex-col items-center justify-center p-6 bg-white overflow-y-auto;
+}
+.digitalReview__questionContent-single {
+    @apply w-full max-w-3xl;
+}
+.digitalReview__material {
+  @apply w-1/2 flex flex-col bg-white;
+}
+.digitalReview__materialContent {
+  @apply flex-1 overflow-y-auto p-6;
+}
+.digitalReview__verticalLine {
+  @apply w-px bg-gray-300;
+}
+.digitalReview__question {
+  @apply w-1/2 flex flex-col bg-white;
+}
+.digitalReview__questionContent {
+  @apply flex-1 overflow-y-auto p-6;
+}
+.digitalReview__questionHeader {
+  @apply flex items-center justify-between mb-4;
+}
+.digitalReview__questionNumber {
+  @apply text-lg font-bold text-gray-500;
+}
+.digitalReview__questionMarkButton {
+  @apply bg-transparent border-none flex items-center cursor-pointer p-2 rounded-lg text-gray-500 hover:bg-yellow-100 hover:text-yellow-700;
+}
+.digitalReview__questionMarkButton.flagged {
+  @apply bg-yellow-400 text-white hover:bg-yellow-500;
+}
+.digitalReview__questionMarkIcon {
+  @apply mr-1;
+}
+.digitalReview__showAnswer {
+    @apply hidden;
+}
+.digitalReview__questionChoices {
+    @apply space-y-3;
+}
+
+.font-size-sm { font-size: 1rem; }
+.font-size-base { font-size: 1.25rem; }
+.font-size-lg { font-size: 1.75rem; }
+.font-size-xl { font-size: 2.25rem; }
+
+.digitalReview__questionQuestion {
+    @apply mb-4 font-semibold;
+}
+.digitalReview__questionChoiceWrapper {
+    @apply w-full;
+}
+.digitalReview__questionChoice {
+  @apply w-full flex items-center text-left p-3 border-2 border-gray-300 rounded-lg bg-transparent cursor-pointer transition-all;
+}
+.digitalReview__questionChoice--selected, .digitalReview__questionChoice:hover {
+  @apply border-blue-500 bg-blue-500/10;
+}
+.digitalReview__questionChoice--eliminated {
+  @apply bg-gray-200 border-gray-300 text-gray-400 line-through;
+}
+.digitalReview__questionChoiceLetter {
+  @apply h-6 w-6 flex-shrink-0 flex items-center justify-center rounded-full border-2 border-current mr-3 font-bold;
+}
+.digitalReview__footer {
+  @apply flex justify-between items-center p-2.5 bg-white shadow-inner;
+}
+.digitalReview__tester {
+  @apply text-sm font-semibold;
+}
+.digitalReview__buttons {
+  @apply flex gap-2;
+}
+
+.digitalReview__navigatorToggle {
+    @apply flex items-center gap-1 font-semibold p-2 rounded-lg hover:bg-secondary;
+}
+.digitalReview__navigatorToggleIcon {
+    @apply transition-transform;
+}
+.digitalReview__navigatorToggle[data-state="open"] .digitalReview__navigatorToggleIcon {
+    @apply rotate-180;
+}
+
+.digitalReview__popup {
+  @apply fixed z-[100] w-[400px] h-[600px] bg-white rounded-lg shadow-2xl border flex flex-col;
+  top: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.digitalReview__popupHeader {
+  @apply h-10 flex items-center justify-between px-3 border-b cursor-move bg-gray-50 rounded-t-lg;
+}
+
+.digitalReview__popupHeaderText {
+    @apply font-semibold;
+}
+.digitalReview__popupHeaderIcon {
+    @apply h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground;
+}
+
+.digitalShortcuts {
+    @apply p-4;
+}

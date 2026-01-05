@@ -1,0 +1,62 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.feature-comparison-section {
+    @apply py-16 sm:py-24 bg-secondary/30;
+}
+
+.comparison-container {
+    @apply container mx-auto max-w-7xl;
+}
+
+.comparison-grid {
+    @apply mt-12 rounded-2xl border bg-card shadow-xl;
+}
+
+.comparison-table {
+    @apply w-full table-fixed;
+}
+
+.comparison-table th,
+.comparison-table td {
+    @apply p-4 text-sm;
+}
+
+.comparison-table thead th {
+    @apply text-center font-semibold text-muted-foreground border-b;
+}
+
+.comparison-table thead th:first-child {
+    @apply text-left;
+}
+
+.comparison-table tbody tr:not(:last-child) {
+    @apply border-b;
+}
+
+.competitor-header .logo {
+    @apply mx-auto transition-transform duration-300 hover:scale-110;
+}
+
+.feature-cell {
+    @apply font-medium text-foreground;
+}
+
+.check-cell {
+    @apply text-center align-middle;
+}
+
+.check-icon, .cross-icon {
+    @apply h-7 w-7 rounded-full p-1.5 inline-flex items-center justify-center;
+}
+
+.ap-ace-col {
+    @apply bg-primary/5;
+}
+
+/* Specificity for border */
+.comparison-table tr, .comparison-table th, .comparison-table td {
+    border-color: hsl(var(--border) / 0.5);
+}

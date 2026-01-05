@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isDev() {
+      return request.auth != null && (
+        request.auth.uid == '95gCM3yprJdpj2F0nLgLyEAd2E53' ||
+        request.auth.token.email in [
+          'epikmathdev@gmail.com',
+          'npatel012010@gmail.com',
+          'artval4games@gmail.com',
+          'team@studizilla.com'
+        ]
+      );
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- Global Dev Rule ---
+    // Devs can read/write everything as a failsafe.
+    match /{document=**} {
+      allow read, write: if isDev();
+    }
+
+    // --- User Data ---
+    match /users/{userId} {
+      allow read: if isOwner(userId) || resource.data.isPrivate == false;
+      allow write: if isOwner(userId);
+    }
+    
+    // --- Collection Group Rules ---
+    match /{path=**}/flashcardDecks/{deckId} {
+      // Allow authenticated users to perform collection group queries for public decks
+      allow get: if request.auth != null && request.query.where.isPublic == true;
+    }
+
+    // --- User Subcollections ---
+
+    // Flashcard Decks: Public decks are readable by everyone, no auth required.
+    match /users/{userId}/flashcardDecks/{deckId} {
+      allow list: if true; // Anyone can list to discover public decks
+      allow get: if resource.data.isPublic == true || isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+
+    // Other user subcollections - owner only
+    match /users/{userId}/deckProgress/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /users/{userId}/events/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /users/{userId}/notifications/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /users/{userId}/tasks/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /users/{userId}/dailyGoals/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // --- Top-Level Collections ---
+
+    match /usernames/{username} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow delete: if resource.data.uid == request.auth.uid;
+    }
+    
+    match /courseContent/{unitId} {
+      allow read: if true;
+      allow write: if isDev();
+    }
+    
+    match /courseDecks/{deckId} {
+      allow read: if true; // Anyone can read course decks
+      allow write: if isDev(); // Only devs can write
+    }
+    
+    match /reviews/{reviewId} {
+      allow create: if request.auth != null;
+      allow read: if false; // Server only
+    }
+
+    match /supportChats/{chatId} {
+      allow read, write: if isOwner(chatId);
+    }
+    match /supportChats/{chatId}/messages/{messageId} {
+      allow read, write: if isOwner(chatId);
+    }
+
+    match /languageRequests/{requestId} {
+      allow create: if request.auth != null;
+    }
+    match /deckReports/{reportId} {
+      allow create: if request.auth != null;
+    }
+    match /cardReports/{reportId} {
+      allow create: if request.auth != null;
+    }
+    match /takedownRequests/{requestId} {
+        allow create: if true; // Open for anyone to submit
+    }
+  }
+}

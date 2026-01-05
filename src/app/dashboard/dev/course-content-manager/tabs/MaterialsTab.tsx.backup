@@ -1,0 +1,631 @@
+'use client';
+
+import { useState, useTransition, useEffect, useRef, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, Trash2, Edit, FileUp, HelpCircle, FileText, ExternalLink, Video, Image, File } from 'lucide-react';
+import type { CourseContent, Material } from '@/lib/course-content-schema';
+import { addMaterialToUnit, addGlobalMaterial, updateMaterial, deleteMaterial } from '../actions';
+import { parseMaterialsWithUnits, MATERIAL_FORMAT_GUIDE, type MaterialWithUnit } from '@/lib/bulk-import-parser';
+
+interface MaterialsTabProps {
+  content: CourseContent;
+  courseId: string;
+  onUpdate: () => void | Promise<void>;
+}
+
+export function MaterialsTab({ content, courseId, onUpdate }: MaterialsTabProps) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isFormatGuideOpen, setIsFormatGuideOpen] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<string>('global');
+  const [editingMaterial, setEditingMaterial] = useState<(Material & { unitId: string }) | null>(null);
+  const [bulkText, setBulkText] = useState('');
+  const [parsedMaterials, setParsedMaterials] = useState<MaterialWithUnit[]>([]);
+  const [isPending, startTransition] = useTransition();
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const { toast } = useToast();
+  
+  // Search & Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterUnit, setFilterUnit] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'pdf' as 'pdf' | 'video' | 'link' | 'image' | 'other',
+    url: '',
+    description: ''
+  });
+
+  // Combine unit materials and global materials
+  const allMaterials = [
+    ...content.units.flatMap(unit =>
+      unit.materials.map(m => ({ ...m, unitId: unit.id, unitTitle: unit.title }))
+    ),
+    ...content.globalMaterials.map(m => ({ ...m, unitId: 'global', unitTitle: 'Global' }))
+  ];
+
+  // Filter materials based on search and filters
+  const filteredMaterials = allMaterials.filter(m => {
+    const matchesSearch = searchQuery === '' || 
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesUnit = filterUnit === 'all' || m.unitId === filterUnit;
+    const matchesType = filterType === 'all' || m.type === filterType;
+    
+    return matchesSearch && matchesUnit && matchesType;
+  });
+
+  // Auto-parse with debounce (like flashcards)
+  const parseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (parseTimeoutRef.current) {
+      clearTimeout(parseTimeoutRef.current);
+    }
+
+    if (!bulkText.trim()) {
+      setParsedMaterials([]);
+      return;
+    }
+
+    parseTimeoutRef.current = setTimeout(() => {
+      try {
+        const parsed = parseMaterialsWithUnits(bulkText);
+        setParsedMaterials(parsed);
+      } catch (error) {
+        setParsedMaterials([]);
+      }
+    }, 500);
+
+    return () => {
+      if (parseTimeoutRef.current) {
+        clearTimeout(parseTimeoutRef.current);
+      }
+    };
+  }, [bulkText]);
+
+  const resetForm = () => {
+    setFormData({ name: '', type: 'pdf', url: '', description: '' });
+    setEditingMaterial(null);
+    setSelectedUnit('global');
+  };
+
+  const handleEdit = (m: Material & { unitId: string }) => {
+    setEditingMaterial(m);
+    setSelectedUnit(m.unitId);
+    setFormData({
+      name: m.name,
+      type: m.type,
+      url: m.url,
+      description: m.description || ''
+    });
+    setIsCreateOpen(true);
+  };
+
+  const handleCreateMaterial = () => {
+    startTransition(async () => {
+      try {
+        if (editingMaterial) {
+          // Update existing material
+          await updateMaterial(courseId, selectedUnit, editingMaterial.id, {
+            name: formData.name,
+            type: formData.type,
+            url: formData.url,
+            description: formData.description || undefined
+          });
+          toast({ title: 'Success', description: 'Material updated successfully!' });
+        } else {
+          // Create new material
+          const newMaterial: Material = {
+            id: crypto.randomUUID(),
+            name: formData.name,
+            type: formData.type,
+            url: formData.url,
+            ...(formData.description && { description: formData.description }),
+            uploadedAt: new Date().toISOString()
+          };
+
+          if (selectedUnit === 'global') {
+            await addGlobalMaterial(courseId, newMaterial);
+          } else {
+            await addMaterialToUnit(courseId, selectedUnit, newMaterial);
+          }
+          
+          toast({ title: 'Success', description: 'Material added!' });
+        }
+        
+        setIsCreateOpen(false);
+        resetForm();
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleSaveBulkMaterials = useCallback(() => {
+    startTransition(async () => {
+      try {
+        setUploadProgress({ current: 0, total: parsedMaterials.length });
+        
+        // Group by unit and global
+        const globalMaterials: Material[] = [];
+        const materialsByUnit = new Map<string, Material[]>();
+        
+        for (const mat of parsedMaterials) {
+          const fullMaterial: Material = {
+            id: crypto.randomUUID(),
+            name: mat.name || '',
+            type: mat.type || 'pdf',
+            url: mat.url || '',
+            ...(mat.description && { description: mat.description }),
+            uploadedAt: new Date().toISOString()
+          };
+
+          if (mat.unitNumber && mat.unitNumber > 0) {
+            const targetUnit = content.units[mat.unitNumber - 1];
+            if (targetUnit) {
+              if (!materialsByUnit.has(targetUnit.id)) {
+                materialsByUnit.set(targetUnit.id, []);
+              }
+              materialsByUnit.get(targetUnit.id)!.push(fullMaterial);
+            }
+          } else {
+            globalMaterials.push(fullMaterial);
+          }
+        }
+
+        // Upload in batches of 10
+        let processed = 0;
+        const batchSize = 10;
+        
+        // Upload global materials
+        for (let i = 0; i < globalMaterials.length; i += batchSize) {
+          const batch = globalMaterials.slice(i, Math.min(i + batchSize, globalMaterials.length));
+          await Promise.all(batch.map(m => addGlobalMaterial(courseId, m)));
+          processed += batch.length;
+          setUploadProgress({ current: processed, total: parsedMaterials.length });
+        }
+        
+        // Upload unit materials
+        for (const [unitId, materials] of materialsByUnit) {
+          for (let i = 0; i < materials.length; i += batchSize) {
+            const batch = materials.slice(i, Math.min(i + batchSize, materials.length));
+            await Promise.all(batch.map(m => addMaterialToUnit(courseId, unitId, m)));
+            processed += batch.length;
+            setUploadProgress({ current: processed, total: parsedMaterials.length });
+          }
+        }
+
+        toast({ 
+          title: '✅ Upload Complete!', 
+          description: `Successfully added ${parsedMaterials.length} material(s)!` 
+        });
+        
+        setIsBulkImportOpen(false);
+        setBulkText('');
+        setParsedMaterials([]);
+        setUploadProgress({ current: 0, total: 0 });
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        setUploadProgress({ current: 0, total: 0 });
+      }
+    });
+  }, [parsedMaterials, courseId, content.units, onUpdate, toast]);
+
+  const handleDeleteMaterial = (unitId: string | null, materialId: string) => {
+    startTransition(async () => {
+      try {
+        await deleteMaterial(courseId, unitId, materialId);
+        toast({ title: 'Success', description: 'Material deleted' });
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'pdf': return <File className="w-4 h-4" />;
+      case 'video': return <Video className="w-4 h-4" />;
+      case 'link': return <ExternalLink className="w-4 h-4" />;
+      case 'image': return <Image className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'pdf': return 'bg-red-500';
+      case 'video': return 'bg-purple-500';
+      case 'link': return 'bg-blue-500';
+      case 'image': return 'bg-green-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2">
+        <Dialog open={isCreateOpen} onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button className="bg-orange-600 hover:bg-orange-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Material
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{editingMaterial ? 'Edit Material' : 'Add Study Material'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Location</Label>
+                <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">Global (all units)</SelectItem>
+                    {content.units.map(unit => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Material Name</Label>
+                <Input 
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Chapter 3 Study Guide"
+                />
+              </div>
+
+              <div>
+                <Label>Type</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={(v) => setFormData({ ...formData, type: v as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF Document</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="link">External Link</SelectItem>
+                    <SelectItem value="image">Image</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>URL</Label>
+                <Input 
+                  value={formData.url}
+                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div>
+                <Label>Description (optional)</Label>
+                <Textarea 
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  placeholder="Brief description of the material..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => {
+                  setIsCreateOpen(false);
+                  resetForm();
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateMaterial}
+                  disabled={isPending || !formData.name || !formData.url}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {editingMaterial ? 'Update Material' : 'Add Material'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-orange-600 text-orange-600 hover:bg-orange-50">
+              <FileUp className="w-4 h-4 mr-2" />
+              Bulk Import
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                Bulk Import Materials
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFormatGuideOpen(true)}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="flex items-center gap-2">
+                  Paste Formatted Materials (Auto-parsing enabled)
+                  {parsedMaterials.length > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                      ✓ {parsedMaterials.length} Material(s) Ready - Units specified in syntax
+                    </span>
+                  )}
+                  {bulkText.trim() && !parsedMaterials.length && (
+                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium animate-pulse">
+                      Parsing...
+                    </span>
+                  )}
+                </Label>
+                <Textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={14}
+                  className="font-mono text-sm"
+                  placeholder="Paste materials in :::MAT::: format (click ? for guide)..."
+                />
+              </div>
+
+              {parsedMaterials.length > 0 && (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <h3 className="font-semibold text-green-600">📚 Parsed {parsedMaterials.length} Material(s):</h3>
+                  {parsedMaterials.map((mat, idx) => {
+                    const unit = mat.unitNumber ? content.units[mat.unitNumber - 1] : null;
+                    return (
+                      <Card key={idx} className="p-4 border-green-200 bg-green-50/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          {unit ? (
+                            <span className="text-xs font-medium bg-orange-600 text-white px-2 py-0.5 rounded">
+                              Unit {mat.unitNumber}: {unit.title}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium bg-gray-600 text-white px-2 py-0.5 rounded">
+                              Global
+                            </span>
+                          )}
+                          <Badge className={getTypeColor(mat.type || 'pdf')}>
+                            {mat.type}
+                          </Badge>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{mat.name}</p>
+                          {mat.description && (
+                            <p className="text-sm text-muted-foreground">{mat.description}</p>
+                          )}
+                          <p className="text-xs text-gray-500 truncate">{mat.url}</p>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                {parsedMaterials.length > 0 && (
+                  <Button 
+                    onClick={handleSaveBulkMaterials}
+                    disabled={isPending}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isPending ? (
+                      <>
+                        <span className="animate-spin mr-2">⏳</span>
+                        Uploading {uploadProgress.current}/{uploadProgress.total}...
+                      </>
+                    ) : (
+                      `Save ${parsedMaterials.length} Material(s)`
+                    )}
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setBulkText('');
+                    setParsedMaterials([]);
+                  }}
+                  disabled={isPending}
+                >
+                  Clear
+                </Button>
+              </div>
+
+              {/* Upload Progress Bar */}
+              {isPending && uploadProgress.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Uploading materials...</span>
+                    <span className="font-semibold text-green-600">
+                      {uploadProgress.current} / {uploadProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-green-500 to-green-600 h-3 transition-all duration-300 ease-out"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    ⚡ Batch uploading for faster performance...
+                  </p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isFormatGuideOpen} onOpenChange={setIsFormatGuideOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Materials Import Format Guide</DialogTitle>
+            </DialogHeader>
+            <pre className="text-xs bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto whitespace-pre-wrap">
+              {MATERIAL_FORMAT_GUIDE}
+            </pre>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Search and Filter Controls */}
+      <Card className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label className="text-sm text-gray-600">Search Materials</Label>
+            <Input
+              placeholder="Search by name or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600">Unit</Label>
+            <Select value={filterUnit} onValueChange={setFilterUnit}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All materials" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Materials</SelectItem>
+                <SelectItem value="global">Global</SelectItem>
+                {content.units.map(unit => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600">Type</Label>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="pdf">PDF</SelectItem>
+                <SelectItem value="video">Video</SelectItem>
+                <SelectItem value="link">Link</SelectItem>
+                <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSearchQuery('');
+              setFilterUnit('all');
+              setFilterType('all');
+            }}
+          >
+            Clear Filters
+          </Button>
+          <p className="text-sm text-gray-600">
+            Showing {filteredMaterials.length} of {allMaterials.length} materials
+          </p>
+        </div>
+      </Card>
+
+      {/* Materials List */}
+      <div className="space-y-4">
+        {filteredMaterials.length === 0 ? (
+          <Card className="p-8 text-center">
+            <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">
+              {allMaterials.length === 0 
+                ? 'No materials yet. Add your first material!' 
+                : 'No materials match your filters.'}
+            </p>
+          </Card>
+        ) : (
+          filteredMaterials.map((material) => (
+            <Card key={material.id} className="p-4">
+              <div className="flex items-start gap-4">
+                <div className={`p-3 rounded-lg ${getTypeColor(material.type)} bg-opacity-10`}>
+                  {getTypeIcon(material.type)}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold">{material.name}</h3>
+                    <Badge variant="outline" className="text-xs">{material.unitTitle}</Badge>
+                  </div>
+                  {material.description && (
+                    <p className="text-sm text-gray-600 mt-1">{material.description}</p>
+                  )}
+                  <a 
+                    href={material.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline mt-2 inline-flex items-center gap-1"
+                  >
+                    Open <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="flex gap-2">
+                  <Badge className={getTypeColor(material.type)}>{material.type}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(material)}
+                    disabled={isPending}
+                    className="hover:bg-blue-50"
+                  >
+                    <Edit className="w-4 h-4 text-blue-500" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteMaterial(material.unitId === 'global' ? null : material.unitId, material.id)}
+                    disabled={isPending}
+                    className="hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

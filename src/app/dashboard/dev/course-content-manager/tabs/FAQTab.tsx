@@ -1,0 +1,850 @@
+'use client';
+
+import { useState, useTransition, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, Trash2, Edit, FileUp, HelpCircle, ChevronUp, ChevronDown, AlertCircle, Eye, EyeOff, Search, X, Maximize2 } from 'lucide-react';
+import type { CourseFAQ } from '@/lib/course-faq-schema';
+import { parseFAQs, validateFAQs, FAQ_FORMAT_GUIDE } from '@/lib/bulk-import-parser';
+import { 
+  createFAQ, 
+  updateFAQ, 
+  deleteFAQ, 
+  bulkCreateFAQs,
+  batchDeleteFAQs,
+  batchUpdateFAQs
+} from '../course-faq-actions';
+
+interface FAQTabProps {
+  courseId: string;
+  faqs: CourseFAQ[];
+  onUpdate: () => void;
+}
+
+export function FAQTab({ courseId, faqs, onUpdate }: FAQTabProps) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isFormatGuideOpen, setIsFormatGuideOpen] = useState(false);
+  const [editingFAQ, setEditingFAQ] = useState<CourseFAQ | null>(null);
+  const [previewFAQ, setPreviewFAQ] = useState<CourseFAQ | null>(null);
+  const [bulkText, setBulkText] = useState('');
+  const [parsedFAQs, setParsedFAQs] = useState<Partial<CourseFAQ>[]>([]);
+  const [selectedFAQs, setSelectedFAQs] = useState<Set<string>>(new Set());
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 });
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+
+  // Auto-parse with debounce
+  const parseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
+    
+    if (!bulkText.trim()) {
+      setParsedFAQs([]);
+      return;
+    }
+
+    parseTimeoutRef.current = setTimeout(() => {
+      try {
+        const parsed = parseFAQs(bulkText);
+        setParsedFAQs(parsed);
+      } catch (error) {
+        setParsedFAQs([]);
+      }
+    }, 500);
+
+    return () => {
+      if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
+    };
+  }, [bulkText]);
+
+  const [formData, setFormData] = useState({
+    question: '',
+    answer: '',
+    category: ''
+  });
+
+  const resetForm = () => {
+    setFormData({
+      question: '',
+      answer: '',
+      category: ''
+    });
+    setEditingFAQ(null);
+  };
+
+  const handleEdit = (faq: CourseFAQ) => {
+    setFormData({
+      question: faq.question,
+      answer: faq.answer,
+      category: faq.category || ''
+    });
+    setEditingFAQ(faq);
+    setIsCreateOpen(true);
+  };
+
+  const handleSaveFAQ = () => {
+    if (!formData.question.trim() || !formData.answer.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Question and answer are required.' });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        if (editingFAQ) {
+          // Update existing FAQ
+          await updateFAQ(editingFAQ.id, {
+            question: formData.question,
+            answer: formData.answer,
+            category: formData.category || undefined
+          });
+          toast({ title: 'Success', description: 'FAQ updated!' });
+        } else {
+          // Create new FAQ
+          await createFAQ({
+            courseId,
+            question: formData.question,
+            answer: formData.answer,
+            category: formData.category || undefined,
+            order: faqs.length,
+            isPublished: false
+          });
+          toast({ title: 'Success', description: 'FAQ created!' });
+        }
+
+        setIsCreateOpen(false);
+        resetForm();
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleBulkImport = () => {
+    try {
+      const parsed = parseFAQs(bulkText);
+      const validation = validateFAQs(parsed);
+      
+      if (!validation.valid) {
+        toast({ 
+          title: 'Validation Error', 
+          description: validation.errors.join('\n'), 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      // Assign order numbers starting from current FAQ count
+      const withOrder = parsed.map((faq, index) => ({
+        ...faq,
+        order: faq.order ?? (faqs.length + index)
+      }));
+
+      setParsedFAQs(withOrder);
+      toast({ 
+        title: 'Success', 
+        description: `Parsed ${parsed.length} FAQ(s)! Review and save.` 
+      });
+    } catch (error: any) {
+      toast({ title: 'Parse Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleSaveBulkFAQs = () => {
+    startTransition(async () => {
+      try {
+        setUploadProgress({ current: 0, total: parsedFAQs.length });
+        
+        // Prepare FAQs for bulk creation
+        const faqsToCreate = parsedFAQs.map((faq, index) => ({
+          courseId,
+          question: faq.question || '',
+          answer: faq.answer || '',
+          category: faq.category,
+          order: faqs.length + index,
+          isPublished: false
+        }));
+
+        await bulkCreateFAQs(faqsToCreate);
+
+        toast({ 
+          title: '✅ Upload Complete!', 
+          description: `Successfully added ${faqsToCreate.length} FAQ(s)!` 
+        });
+        
+        setIsBulkImportOpen(false);
+        setBulkText('');
+        setParsedFAQs([]);
+        setUploadProgress({ current: 0, total: 0 });
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        setUploadProgress({ current: 0, total: 0 });
+      }
+    });
+  };
+
+  const handleDeleteFAQ = (faqId: string) => {
+    startTransition(async () => {
+      try {
+        await deleteFAQ(faqId);
+        toast({ title: 'Success', description: 'FAQ deleted' });
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    startTransition(async () => {
+      try {
+        const updates = [
+          { id: faqs[index - 1].id, data: { order: faqs[index].order } },
+          { id: faqs[index].id, data: { order: faqs[index - 1].order } }
+        ];
+        await batchUpdateFAQs(updates);
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === faqs.length - 1) return;
+    startTransition(async () => {
+      try {
+        const updates = [
+          { id: faqs[index].id, data: { order: faqs[index + 1].order } },
+          { id: faqs[index + 1].id, data: { order: faqs[index].order } }
+        ];
+        await batchUpdateFAQs(updates);
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const toggleFAQSelection = (faqId: string) => {
+    const newSelected = new Set(selectedFAQs);
+    if (newSelected.has(faqId)) {
+      newSelected.delete(faqId);
+    } else {
+      newSelected.add(faqId);
+    }
+    setSelectedFAQs(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedFAQs.size === faqs.length) {
+      setSelectedFAQs(new Set());
+    } else {
+      setSelectedFAQs(new Set(faqs.map(f => f.id)));
+    }
+  };
+
+  const handleBatchPublish = (publish: boolean) => {
+    if (selectedFAQs.size === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No FAQs selected' });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const updates = Array.from(selectedFAQs).map(id => ({
+          id,
+          data: { isPublished: publish }
+        }));
+        await batchUpdateFAQs(updates);
+        toast({ 
+          title: 'Success', 
+          description: `${selectedFAQs.size} FAQ(s) ${publish ? 'published' : 'unpublished'}` 
+        });
+        setSelectedFAQs(new Set());
+        onUpdate();
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+      }
+    });
+  };
+
+  const handleTogglePublish = (faq: CourseFAQ) => {
+    startTransition(async () => {
+      try {
+        await updateFAQ(faq.id, { isPublished: !faq.isPublished });
+        toast({ 
+          title: faq.isPublished ? "Unpublished" : "Published!", 
+          description: `FAQ is now ${faq.isPublished ? 'hidden from' : 'visible to'} students.` 
+        });
+        onUpdate();
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+      }
+    });
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedFAQs.size === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No FAQs selected' });
+      return;
+    }
+
+    if (!confirm(`Delete ${selectedFAQs.size} FAQ(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        setDeleteProgress({ current: 0, total: selectedFAQs.size });
+        await batchDeleteFAQs(Array.from(selectedFAQs));
+        
+        toast({ title: '✅ Deletion Complete!', description: `Successfully deleted ${selectedFAQs.size} FAQ(s)` });
+        setSelectedFAQs(new Set());
+        setDeleteProgress({ current: 0, total: 0 });
+        onUpdate();
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+        setDeleteProgress({ current: 0, total: 0 });
+      }
+    });
+  };
+
+  const sortedFAQs = [...faqs].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  // Get unique categories for filter
+  const allCategories = Array.from(new Set(faqs.map(f => f.category).filter(Boolean))) as string[];
+
+  // Filter FAQs based on search and filters
+  const filteredFAQs = sortedFAQs.filter(faq => {
+    // Search filter (searches question, answer, and category)
+    const matchesSearch = searchQuery === '' || 
+      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      faq.answer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (faq.category && faq.category.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Category filter
+    const matchesCategory = filterCategory === 'all' || 
+      (filterCategory === 'none' && !faq.category) ||
+      faq.category === filterCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterCategory('all');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2">
+        <Dialog open={isCreateOpen} onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button className="bg-pink-600 hover:bg-pink-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Add FAQ
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingFAQ ? 'Edit FAQ' : 'Create FAQ'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Question</Label>
+                <Input 
+                  value={formData.question}
+                  onChange={(e) => setFormData({ ...formData, question: e.target.value })}
+                  placeholder="e.g., How long is the AP Chemistry exam?"
+                />
+              </div>
+
+              <div>
+                <Label>Answer</Label>
+                <Textarea 
+                  value={formData.answer}
+                  onChange={(e) => setFormData({ ...formData, answer: e.target.value })}
+                  rows={8}
+                  placeholder="Provide a detailed answer to the question..."
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <Label>Category (Optional)</Label>
+                <Input 
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="e.g., Exam Format, Study Tips, Course Content"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  onClick={handleSaveFAQ} 
+                  disabled={!formData.question || !formData.answer || isPending}
+                  className="bg-pink-600 hover:bg-pink-700"
+                >
+                  {isPending ? 'Saving...' : editingFAQ ? 'Update FAQ' : 'Create FAQ'}
+                </Button>
+                <Button 
+                  onClick={() => setIsCreateOpen(false)} 
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-pink-600 text-pink-600 hover:bg-pink-50">
+              <FileUp className="w-4 h-4 mr-2" />
+              Bulk Import
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Bulk Import FAQs</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-pink-50 dark:bg-pink-950 p-4 rounded-lg border border-pink-200 dark:border-pink-800">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-pink-600 mt-0.5" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-pink-900 dark:text-pink-100">
+                      Use our special FAQ syntax below. Each FAQ starts with :::FAQ:::
+                    </p>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-pink-600 hover:text-pink-700"
+                      onClick={() => setIsFormatGuideOpen(true)}
+                    >
+                      <HelpCircle className="w-4 h-4 mr-1" />
+                      View Format Guide & Examples
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label>Paste FAQ Text (Using :::FAQ::: Syntax)</Label>
+                <Textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={15}
+                  placeholder=":::FAQ:::
+q::=How long is the exam?
+a::=The exam is 3 hours and 15 minutes long...
+cat::=Exam Format
+
+:::FAQ:::
+q::=What calculator is allowed?
+a::=Scientific or graphing calculators are allowed..."
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              {uploadProgress.total > 0 && (
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-muted-foreground">
+                      ⚡ Batch uploading for faster performance...
+                    </span>
+                    <span className="text-sm font-medium">
+                      {uploadProgress.current}/{uploadProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-pink-500 to-rose-600 transition-all duration-300"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleBulkImport} 
+                  variant="outline"
+                  title="Manual parse (auto-parse happens automatically)"
+                >
+                  Parse FAQs
+                </Button>
+                <Button 
+                  onClick={handleSaveBulkFAQs}
+                  disabled={parsedFAQs.length === 0 || isPending}
+                  className="bg-pink-600 hover:bg-pink-700"
+                >
+                  {isPending && uploadProgress.total > 0 ? (
+                    <>
+                      <span className="mr-2 inline-block animate-spin">⏳</span>
+                      Uploading {uploadProgress.current}/{uploadProgress.total}...
+                    </>
+                  ) : (
+                    <>Save {parsedFAQs.length} FAQ(s)</>
+                  )}
+                </Button>
+              </div>
+
+              {parsedFAQs.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <h4 className="font-semibold text-sm">Preview ({parsedFAQs.length} FAQs)</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {parsedFAQs.map((faq, idx) => (
+                      <Card key={idx} className="p-3 bg-muted/50">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm">{faq.question}</p>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{faq.answer}</p>
+                            {faq.category && (
+                              <Badge variant="outline" className="mt-2 text-xs">
+                                {faq.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isFormatGuideOpen} onOpenChange={setIsFormatGuideOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>FAQ Bulk Import Format Guide</DialogTitle>
+            </DialogHeader>
+            <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+              {FAQ_FORMAT_GUIDE}
+            </pre>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Search and Filter Section */}
+      {sortedFAQs.length > 0 && (
+        <Card className="p-4">
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search FAQs (question, answer, or category)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="none">No Category</SelectItem>
+                  {allCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(searchQuery || filterCategory !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="shrink-0"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+            {(searchQuery || filterCategory !== 'all') && (
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredFAQs.length} of {sortedFAQs.length} FAQs
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Selection and Batch Actions */}
+      {sortedFAQs.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedFAQs.size === faqs.length && faqs.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-medium">
+                  Select All ({selectedFAQs.size}/{faqs.length})
+                </span>
+              </label>
+            </div>
+
+            {selectedFAQs.size > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBatchPublish(true)}
+                  disabled={isPending}
+                  className="border-green-500 text-green-600 hover:bg-green-50"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Publish Selected
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBatchPublish(false)}
+                  disabled={isPending}
+                  className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                >
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  Unpublish Selected
+                </Button>
+                {deleteProgress.total > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Deleting {deleteProgress.current}/{deleteProgress.total}...
+                    </span>
+                    <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-red-500 to-rose-600 transition-all duration-300"
+                        style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="border-red-500 text-red-600 hover:bg-red-50"
+                >
+                  {isPending && deleteProgress.total > 0 ? (
+                    <>
+                      <span className="mr-2 inline-block animate-spin">🗑️</span>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {sortedFAQs.length === 0 ? (
+        <Card className="p-12 text-center">
+          <HelpCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">No FAQs Yet</h3>
+          <p className="text-muted-foreground mb-4">
+            Add frequently asked questions to help students understand the course better.
+          </p>
+          <Button onClick={() => setIsCreateOpen(true)} className="bg-pink-600 hover:bg-pink-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Your First FAQ
+          </Button>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredFAQs.map((faq, index) => {
+            // Get original index for move operations
+            const originalIndex = sortedFAQs.findIndex(f => f.id === faq.id);
+            return (
+              <Card key={faq.id} className={faq.isPublished ? 'border-green-500/30 bg-green-500/5' : 'border-orange-500/30 bg-orange-500/5'}>
+                <div className="flex items-start gap-4 p-4">
+                  <div className="pt-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedFAQs.has(faq.id)}
+                      onChange={() => toggleFAQSelection(faq.id)}
+                      className="w-4 h-4"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 pt-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleMoveUp(originalIndex)}
+                      disabled={originalIndex === 0 || isPending}
+                      className="h-6 w-6 p-0"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleMoveDown(originalIndex)}
+                      disabled={originalIndex === sortedFAQs.length - 1 || isPending}
+                      className="h-6 w-6 p-0"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-base">{faq.question}</h4>
+                        <Badge variant={faq.isPublished ? 'default' : 'secondary'}>
+                          {faq.isPublished ? (
+                            <><Eye className="h-3 w-3 mr-1" /> Published</>
+                          ) : (
+                            <><EyeOff className="h-3 w-3 mr-1" /> Draft</>
+                          )}
+                        </Badge>
+                      </div>
+                      {faq.category && (
+                        <Badge variant="outline" className="text-xs mb-2">
+                          {faq.category}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setPreviewFAQ(faq)}
+                        title="Preview FAQ"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleTogglePublish(faq)}
+                        disabled={isPending}
+                        className={faq.isPublished ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
+                      >
+                        {faq.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEdit(faq)}
+                        disabled={isPending}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm('Delete this FAQ?')) {
+                            handleDeleteFAQ(faq.id);
+                          }
+                        }}
+                        disabled={isPending}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{faq.answer}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Order: {faq.order} • Updated: {new Date(faq.updatedAt).toLocaleDateString()}
+                  </p>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* FAQ Preview Dialog */}
+      <Dialog open={!!previewFAQ} onOpenChange={(open) => !open && setPreviewFAQ(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5" />
+              FAQ Preview
+            </DialogTitle>
+          </DialogHeader>
+          
+          {previewFAQ && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                {previewFAQ.category && (
+                  <Badge variant="outline">{previewFAQ.category}</Badge>
+                )}
+                <Badge variant={previewFAQ.isPublished ? 'default' : 'secondary'}>
+                  {previewFAQ.isPublished ? '✅ Published' : '📝 Draft'}
+                </Badge>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-6 border">
+                <h3 className="font-semibold text-lg mb-4">{previewFAQ.question}</h3>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <p className="whitespace-pre-wrap leading-relaxed">{previewFAQ.answer}</p>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground border-t pt-3 flex items-center justify-between">
+                <span>Order: {previewFAQ.order}</span>
+                <span>Updated: {new Date(previewFAQ.updatedAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>      {sortedFAQs.length > 0 && (
+        <div className="pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Total FAQs: <span className="font-semibold">{sortedFAQs.length}</span>
+              {' • '}
+              <span className="text-green-600 font-semibold">{sortedFAQs.filter(f => f.isPublished).length} Published</span>
+              {' • '}
+              <span className="text-orange-600 font-semibold">{sortedFAQs.filter(f => !f.isPublished).length} Draft</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Use arrows to reorder • Only published FAQs are visible to students
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

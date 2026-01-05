@@ -1,0 +1,124 @@
+/* Hide the resize handle arrow from react-grid-layout */
+.react-grid-item > .react-resizable-handle {
+  display: none !important;
+}
+
+/* Grid Card Wrapper */
+.grid-card-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Drag Handle - 6 dot grip in top-left corner */
+.drag-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35px;
+  height: 10px;
+  cursor: grab;
+  z-index: 1;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 10px;
+  background: transparent;
+  transition: all 0.2s ease;
+  opacity: 0;
+  flex-shrink: 0;
+  flex-grow: 0;
+  pointer-events: all;
+}
+
+.grid-card-wrapper:hover .drag-handle {
+  opacity: 1;
+  background: hsl(var(--muted) / 0.2);
+}
+
+.drag-handle:hover {
+  background: hsl(var(--muted) / 0.7);
+  transform: scale(1.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+/* Create 6 dots in a 3x2 grid pattern */
+.drag-handle::before {
+  content: "";
+  width: 15px;
+  height: 10px;
+  display: block;
+  background-image: 
+    radial-gradient(circle, hsl(var(--muted-foreground) / 0.7) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--muted-foreground) / 0.7) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--muted-foreground) / 0.7) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--muted-foreground) / 0.7) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--muted-foreground) / 0.7) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--muted-foreground) / 0.7) 1.5px, transparent 1.5px);
+  background-size: 3px 3px;
+  background-position: 
+    0% 0%,
+    50% 0%,
+    100% 0%,
+    0% 100%,
+    50% 100%,
+    100% 100%;
+  background-repeat: no-repeat;
+  transition: all 0.2s;
+}
+
+.drag-handle:hover::before {
+  background-image: 
+    radial-gradient(circle, hsl(var(--primary)) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--primary)) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--primary)) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--primary)) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--primary)) 1.5px, transparent 1.5px),
+    radial-gradient(circle, hsl(var(--primary)) 1.5px, transparent 1.5px);
+}
+
+/* Remove any red/placeholder styling from react-grid-layout */
+.react-grid-item.react-grid-placeholder {
+  background: hsl(var(--primary) / 0.15) !important;
+  border: 2px dashed hsl(var(--primary) / 0.4) !important;
+  border-radius: 1rem !important;
+  transition-duration: 100ms !important;
+  z-index: 50 !important;
+  opacity: 1 !important;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Ensure grid items don't have red backgrounds */
+.react-grid-item {
+  background: transparent !important;
+  position: relative;
+  transition: all 200ms ease;
+  border-radius: 1rem;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none !important;
+  z-index: 200 !important;
+  will-change: transform !important;
+  opacity: 0.9 !important;
+}
+
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}

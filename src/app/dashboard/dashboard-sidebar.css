@@ -1,0 +1,192 @@
+/* Sidebar hover expansion styles */
+
+/* Ultra smooth animations */
+[data-sidebar="sidebar"] * {
+  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ALWAYS show icons - LOCKED SIZE */
+[data-sidebar="menu-button"] svg {
+  display: block !important;
+  opacity: 1 !important;
+  flex-shrink: 0 !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  min-height: 1.25rem !important;
+  max-width: 1.25rem !important;
+  max-height: 1.25rem !important;
+}
+
+/* Hide header text when collapsed, keep icon visible */
+[data-collapsible="icon"] [data-logo-text] {
+  opacity: 0 !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+  flex: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+}
+
+[data-collapsible="icon"] [data-logo-container] {
+  justify-content: center !important;
+  width: 100% !important;
+  padding-left: 0.7rem !important;
+}
+
+[data-collapsible="icon"] [data-logo-icon] {
+  margin: 0 !important;
+}
+
+[data-collapsible="icon"] [data-sidebar="header"] button span {
+  opacity: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Remove footer padding when collapsed to fix scrollbar, add it back when expanded/hover */
+[data-collapsible="icon"] [data-sidebar="footer"] {
+  padding: 0.75rem 0.5rem !important;
+  overflow: hidden !important;
+}
+
+[data-state="expanded"] [data-sidebar="footer"],
+.group\/sidebar-hover:hover [data-sidebar="footer"] {
+  padding: 1rem !important;
+}
+``
+/* Remove all scrollbars from sidebar */
+[data-sidebar="sidebar"],
+.group\/sidebar-hover {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+}
+[data-sidebar="sidebar"]::-webkit-scrollbar,
+.group\/sidebar-hover::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Show header text when expanded OR on hover when closed */
+.group\/sidebar-hover:hover [data-logo-text],
+[data-state="expanded"] [data-logo-text] {
+  opacity: 1 !important;
+  max-width: 200px !important;
+  flex: 1 !important;
+  visibility: visible !important;
+}
+
+.group\/sidebar-hover:hover [data-sidebar="header"] button span,
+[data-state="expanded"] [data-sidebar="header"] button span {
+  opacity: 1 !important;
+  max-width: 200px !important;
+  margin-left: 0.5rem !important;
+}
+
+/* Hide menu text when collapsed */
+[data-collapsible="icon"] [data-sidebar="menu-button"] span:not(.lucide) {
+  max-width: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  transition: all 200ms ease-in-out !important;
+}
+
+/* Show menu text when expanded OR on hover when closed */
+.group\/sidebar-hover:hover [data-sidebar="menu-button"] span:not(.lucide),
+[data-state="expanded"] [data-sidebar="menu-button"] span:not(.lucide) {
+  max-width: 200px !important;
+  opacity: 1 !important;
+  margin-left: 0.75rem !important;
+}
+
+/* Footer - center avatar when collapsed */
+[data-collapsible="icon"] [data-sidebar="footer"] {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+[data-collapsible="icon"] [data-sidebar="footer"] > div {
+  display: flex !important;
+  justify-content: center !important;
+  padding-left: 1.25rem !important;
+}
+
+/* Footer - hide text when collapsed */
+[data-collapsible="icon"] [data-sidebar="footer"] button > div:not(:first-child) {
+  max-width: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  transition: all 200ms ease-in-out !important;
+  margin-left: 0 !important;
+}
+
+/* Show footer text when expanded OR on hover when closed */
+.group\/sidebar-hover:hover [data-sidebar="footer"] button,
+[data-state="expanded"] [data-sidebar="footer"] button {
+  justify-content: flex-start !important;
+  padding: 0.5rem !important;
+}
+
+.group\/sidebar-hover:hover [data-sidebar="footer"] button > div:not(:first-child),
+[data-state="expanded"] [data-sidebar="footer"] button > div:not(:first-child) {
+  max-width: 300px !important;
+  opacity: 1 !important;
+  margin-left: 0.75rem !important;
+}
+
+/* Make sure sidebar container expands */
+.group\/sidebar-hover:hover [data-sidebar="sidebar"] {
+  width: 100% !important;
+}
+
+/* Fix button alignment when collapsed - center icons perfectly */
+[data-collapsible="icon"] [data-sidebar="menu-button"] {
+  justify-content: center !important;
+  padding: 0.625rem !important;
+  margin: 0.125rem auto !important;
+  display: flex !important;
+  align-items: center !important;
+  min-width: 2.5rem !important;
+  width: auto !important;
+}
+
+/* Icons centered when collapsed */
+[data-collapsible="icon"] [data-sidebar="menu-button"] svg {
+  margin: 0 !important;
+}
+
+/* Reset button alignment on hover */
+.group\/sidebar-hover:hover [data-sidebar="menu-button"] {
+  justify-content: flex-start !important;
+  padding: 0.5rem !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* Perfect highlight alignment */
+[data-sidebar="menu-button"] {
+  min-height: 2.5rem !important;
+  border-radius: 0.5rem !important;
+}
+
+/* Active state - simple background highlight */
+[data-sidebar="menu-button"][data-active="true"],
+[data-sidebar="menu-button"].bg-primary {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+[data-sidebar="menu-button"][data-active="true"]:hover,
+[data-sidebar="menu-button"].bg-primary:hover {
+  background-color: hsl(var(--primary) / 0.9) !important;
+}
+
+/* Don't change icon when active - keep same layout */
+[data-sidebar="menu-button"][data-active="true"] svg,
+[data-sidebar="menu-button"].bg-primary svg {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  flex-shrink: 0 !important;
+}
+

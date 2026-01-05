@@ -1,0 +1,1034 @@
+'use client';
+
+import { useState, useTransition, useEffect, useRef, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, Trash2, Edit, Upload, FileUp, HelpCircle } from 'lucide-react';
+import { CourseContent, Question, QuestionType, Unit } from '@/lib/course-content-schema';
+import { addQuestionToUnit, updateQuestion, deleteQuestion } from '../actions';
+import { parseQuestionsWithUnits, QUESTION_FORMAT_GUIDE, type QuestionWithUnit } from '@/lib/bulk-import-parser';
+
+interface QuestionsTabProps {
+  content: CourseContent;
+  courseId: string;
+  onUpdate: () => void | Promise<void>;
+}
+
+export function QuestionsTab({ content, courseId, onUpdate }: QuestionsTabProps) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isFormatGuideOpen, setIsFormatGuideOpen] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<string>('');
+  const [editingQuestion, setEditingQuestion] = useState<(Question & { unitId: string }) | null>(null);
+  const [bulkText, setBulkText] = useState('');
+  const [parsedQuestions, setParsedQuestions] = useState<QuestionWithUnit[]>([]);
+  const [isPending, startTransition] = useTransition();
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 });
+  const { toast } = useToast();
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
+  
+  // Search & Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterUnit, setFilterUnit] = useState<string>('all');
+  const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+
+  // Auto-parse with debounce (like flashcards)
+  const parseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (parseTimeoutRef.current) {
+      clearTimeout(parseTimeoutRef.current);
+    }
+
+    if (!bulkText.trim()) {
+      setParsedQuestions([]);
+      return;
+    }
+
+    parseTimeoutRef.current = setTimeout(() => {
+      try {
+        const parsed = parseQuestionsWithUnits(bulkText);
+        setParsedQuestions(parsed);
+      } catch (error) {
+        setParsedQuestions([]);
+      }
+    }, 500);
+
+    return () => {
+      if (parseTimeoutRef.current) {
+        clearTimeout(parseTimeoutRef.current);
+      }
+    };
+  }, [bulkText]);
+
+  const [formData, setFormData] = useState({
+    question: '',
+    type: 'multiple-choice' as QuestionType,
+    options: ['', '', '', ''],
+    correctAnswer: '',
+    explanation: '',
+    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
+    points: 1,
+    tags: '',
+    sampleAnswer: '',
+    rubric: ''
+  });
+
+  const allQuestions = content.units.flatMap(unit =>
+    unit.questions.map(q => ({ ...q, unitId: unit.id, unitTitle: unit.title }))
+  );
+
+  // Filter questions based on search and filters
+  const filteredQuestions = allQuestions.filter(q => {
+    const matchesSearch = searchQuery === '' || 
+      q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesUnit = filterUnit === 'all' || q.unitId === filterUnit;
+    const matchesDifficulty = filterDifficulty === 'all' || q.difficulty === filterDifficulty;
+    const matchesType = filterType === 'all' || q.type === filterType;
+    
+    return matchesSearch && matchesUnit && matchesDifficulty && matchesType;
+  });
+
+  const resetForm = () => {
+    setFormData({
+      question: '',
+      type: 'multiple-choice',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      explanation: '',
+      difficulty: 'medium',
+      points: 1,
+      tags: '',
+      sampleAnswer: '',
+      rubric: ''
+    });
+    setEditingQuestion(null);
+    setSelectedUnit('');
+  };
+
+  const handleEdit = (q: Question & { unitId: string }) => {
+    setEditingQuestion(q);
+    setSelectedUnit(q.unitId);
+    setFormData({
+      question: q.question,
+      type: q.type,
+      options: q.options && q.options.length > 0 ? [...q.options, '', '', '', ''].slice(0, 4) : ['', '', '', ''],
+      correctAnswer: q.correctAnswer || '',
+      explanation: q.explanation || '',
+      difficulty: q.difficulty,
+      points: q.points,
+      tags: q.tags?.join(', ') || '',
+      sampleAnswer: q.sampleAnswer || '',
+      rubric: q.rubric || ''
+    });
+    setIsCreateOpen(true);
+  };
+
+  const toggleSelectQuestion = (questionId: string) => {
+    const newSelected = new Set(selectedQuestions);
+    if (newSelected.has(questionId)) {
+      newSelected.delete(questionId);
+    } else {
+      newSelected.add(questionId);
+    }
+    setSelectedQuestions(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedQuestions.size === filteredQuestions.length) {
+      setSelectedQuestions(new Set());
+    } else {
+      setSelectedQuestions(new Set(filteredQuestions.map(q => q.id)));
+    }
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedQuestions.size === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No questions selected' });
+      return;
+    }
+
+    if (!confirm(`Delete ${selectedQuestions.size} selected question(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const questionsToDelete = Array.from(selectedQuestions);
+        setDeleteProgress({ current: 0, total: questionsToDelete.length });
+        
+        const batchSize = 10;
+        let successCount = 0;
+        let failCount = 0;
+        
+        // Delete in batches of 10
+        for (let i = 0; i < questionsToDelete.length; i += batchSize) {
+          const batch = questionsToDelete.slice(i, Math.min(i + batchSize, questionsToDelete.length));
+          
+          const results = await Promise.allSettled(batch.map(questionId => {
+            const question = allQuestions.find(q => q.id === questionId);
+            if (question) {
+              return deleteQuestion(courseId, question.unitId, questionId);
+            }
+            return Promise.resolve();
+          }));
+          
+          // Count successes and failures
+          results.forEach(result => {
+            if (result.status === 'fulfilled') {
+              successCount++;
+            } else {
+              failCount++;
+              console.error('Delete failed:', result.reason);
+            }
+          });
+          
+          setDeleteProgress({ current: Math.min(i + batchSize, questionsToDelete.length), total: questionsToDelete.length });
+        }
+        
+        if (failCount > 0) {
+          toast({ 
+            variant: 'destructive',
+            title: 'Partial Deletion', 
+            description: `Deleted ${successCount} question(s), ${failCount} failed` 
+          });
+        } else {
+          toast({ 
+            title: '✅ Deletion Complete!', 
+            description: `Successfully deleted ${successCount} question(s)` 
+          });
+        }
+        
+        setSelectedQuestions(new Set());
+        setDeleteProgress({ current: 0, total: 0 });
+        
+        // Force refresh with a slight delay to ensure Firestore has propagated
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await onUpdate();
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+        setDeleteProgress({ current: 0, total: 0 });
+      }
+    });
+  };
+
+  const handleCreateQuestion = () => {
+    if (!selectedUnit) {
+      toast({ title: 'Error', description: 'Please select a unit', variant: 'destructive' });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const questionData = {
+          type: formData.type,
+          question: formData.question,
+          options: formData.type !== 'free-response' ? formData.options.filter(o => o) : [],
+          correctAnswer: formData.correctAnswer,
+          explanation: formData.explanation,
+          difficulty: formData.difficulty,
+          points: formData.points,
+          tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+        };
+
+        if (formData.type === 'free-response') {
+          if (formData.sampleAnswer) (questionData as any).sampleAnswer = formData.sampleAnswer;
+          if (formData.rubric) (questionData as any).rubric = formData.rubric;
+        }
+
+        if (editingQuestion) {
+          // Update existing question
+          await updateQuestion(courseId, selectedUnit, editingQuestion.id, questionData);
+          toast({ title: 'Success', description: 'Question updated successfully!' });
+        } else {
+          // Create new question
+          const newQuestion: Question = {
+            id: crypto.randomUUID(),
+            type: questionData.type,
+            question: questionData.question,
+            options: questionData.options,
+            correctAnswer: questionData.correctAnswer,
+            explanation: questionData.explanation,
+            difficulty: questionData.difficulty,
+            points: questionData.points,
+            tags: questionData.tags,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            ...(formData.type === 'free-response' && formData.sampleAnswer ? { sampleAnswer: formData.sampleAnswer } : {}),
+            ...(formData.type === 'free-response' && formData.rubric ? { rubric: formData.rubric } : {})
+          };
+          await addQuestionToUnit(courseId, selectedUnit, newQuestion);
+          toast({ title: 'Success', description: 'Question added successfully!' });
+        }
+
+        setIsCreateOpen(false);
+        resetForm();
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  // Auto-parse already added above, remove duplicate
+
+  const handleSaveBulkQuestions = useCallback(() => {
+    startTransition(async () => {
+      try {
+        setUploadProgress({ current: 0, total: parsedQuestions.length });
+        
+        // Group questions by unit for batch processing
+        const questionsByUnit = new Map<string, Question[]>();
+        
+        for (const q of parsedQuestions) {
+          const fullQuestion: Question = {
+            id: crypto.randomUUID(),
+            type: q.type || 'multiple-choice',
+            question: q.question || '',
+            options: q.options || [],
+            correctAnswer: q.correctAnswer || '',
+            difficulty: q.difficulty || 'medium',
+            tags: q.tags || [],
+            points: q.points || 1,
+            ...(q.explanation && { explanation: q.explanation }),
+            ...(q.sampleAnswer && { sampleAnswer: q.sampleAnswer }),
+            ...(q.rubric && { rubric: q.rubric }),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          // Group by unit
+          if (q.unitNumber && q.unitNumber > 0) {
+            const targetUnit = content.units[q.unitNumber - 1];
+            if (targetUnit) {
+              if (!questionsByUnit.has(targetUnit.id)) {
+                questionsByUnit.set(targetUnit.id, []);
+              }
+              questionsByUnit.get(targetUnit.id)!.push(fullQuestion);
+            }
+          }
+        }
+
+        // Process in batches of 10 for faster uploads
+        let processed = 0;
+        for (const [unitId, questions] of questionsByUnit) {
+          // Process 10 at a time in parallel
+          const batchSize = 10;
+          for (let i = 0; i < questions.length; i += batchSize) {
+            const batch = questions.slice(i, Math.min(i + batchSize, questions.length));
+            await Promise.all(
+              batch.map(q => addQuestionToUnit(courseId, unitId, q))
+            );
+            processed += batch.length;
+            setUploadProgress({ current: processed, total: parsedQuestions.length });
+          }
+        }
+
+        toast({ 
+          title: '✅ Upload Complete!', 
+          description: `Successfully added ${parsedQuestions.length} question(s)!` 
+        });
+        
+        setIsBulkImportOpen(false);
+        setBulkText('');
+        setParsedQuestions([]);
+        setUploadProgress({ current: 0, total: 0 });
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        setUploadProgress({ current: 0, total: 0 });
+      }
+    });
+  }, [parsedQuestions, courseId, content.units, onUpdate, toast]);
+
+  const handleDeleteQuestion = (unitId: string, questionId: string) => {
+    startTransition(async () => {
+      try {
+        await deleteQuestion(courseId, unitId, questionId);
+        toast({ title: 'Success', description: 'Question deleted' });
+        onUpdate();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+    });
+  };
+
+  const getDifficultyColor = (diff: string) => {
+    switch (diff) {
+      case 'easy': return 'bg-green-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'hard': return 'bg-red-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getTypeLabel = (type: QuestionType) => {
+    switch (type) {
+      case 'multiple-choice': return 'MCQ';
+      case 'free-response': return 'FRQ';
+      case 'true-false': return 'T/F';
+      default: return type;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2">
+        <Dialog open={isCreateOpen} onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button className="bg-pink-600 hover:bg-pink-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Question
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingQuestion ? 'Edit Question' : 'Add Practice Question'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Unit</Label>
+                <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {content.units.map(unit => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Question Type</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={(v) => setFormData({ ...formData, type: v as QuestionType })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+                    <SelectItem value="free-response">Free Response</SelectItem>
+                    <SelectItem value="true-false">True/False</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Question</Label>
+                <Textarea 
+                  value={formData.question}
+                  onChange={(e) => setFormData({ ...formData, question: e.target.value })}
+                  rows={3}
+                  placeholder="Enter the question..."
+                />
+              </div>
+
+              {formData.type === 'multiple-choice' && (
+                <div>
+                  <Label>Answer Options</Label>
+                  {formData.options.map((opt, idx) => (
+                    <Input
+                      key={idx}
+                      value={opt}
+                      onChange={(e) => {
+                        const newOptions = [...formData.options];
+                        newOptions[idx] = e.target.value;
+                        setFormData({ ...formData, options: newOptions });
+                      }}
+                      placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                      className="mt-2"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {formData.type === 'true-false' && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    Options are automatically set to True/False
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Correct Answer</Label>
+                  {formData.type === 'multiple-choice' ? (
+                    <Select 
+                      value={formData.correctAnswer} 
+                      onValueChange={(v) => setFormData({ ...formData, correctAnswer: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select correct option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formData.options.filter(o => o).map((opt, idx) => (
+                          <SelectItem key={idx} value={idx.toString()}>
+                            {String.fromCharCode(65 + idx)}: {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : formData.type === 'true-false' ? (
+                    <Select 
+                      value={formData.correctAnswer} 
+                      onValueChange={(v) => setFormData({ ...formData, correctAnswer: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select answer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="True">True</SelectItem>
+                        <SelectItem value="False">False</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Textarea 
+                      value={formData.correctAnswer}
+                      onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
+                      rows={2}
+                      placeholder="Model answer..."
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <Label>Difficulty</Label>
+                  <Select 
+                    value={formData.difficulty} 
+                    onValueChange={(v) => setFormData({ ...formData, difficulty: v as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">Easy</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label>Explanation</Label>
+                <Textarea 
+                  value={formData.explanation}
+                  onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
+                  rows={3}
+                  placeholder="Explain why this is the correct answer..."
+                />
+              </div>
+
+              {formData.type === 'free-response' && (
+                <>
+                  <div>
+                    <Label>Sample Answer (Optional)</Label>
+                    <Textarea 
+                      value={formData.sampleAnswer}
+                      onChange={(e) => setFormData({ ...formData, sampleAnswer: e.target.value })}
+                      rows={3}
+                      placeholder="Example of a good student response..."
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Rubric (Optional)</Label>
+                    <Textarea 
+                      value={formData.rubric}
+                      onChange={(e) => setFormData({ ...formData, rubric: e.target.value })}
+                      rows={3}
+                      placeholder="Grading rubric (e.g., 1pt for X, 2pts for Y...)"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Points</Label>
+                  <Input 
+                    type="number"
+                    value={formData.points}
+                    onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) || 1 })}
+                    min={1}
+                  />
+                </div>
+
+                <div>
+                  <Label>Tags (comma-separated)</Label>
+                  <Input 
+                    value={formData.tags}
+                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    placeholder="e.g., photosynthesis, biology"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => {
+                  setIsCreateOpen(false);
+                  resetForm();
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateQuestion}
+                  disabled={isPending || !formData.question || !selectedUnit}
+                  className="bg-pink-600 hover:bg-pink-700"
+                >
+                  {editingQuestion ? 'Update Question' : 'Add Question'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-pink-600 text-pink-600 hover:bg-pink-50">
+              <FileUp className="w-4 h-4 mr-2" />
+              Bulk Import
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                Bulk Import Questions
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFormatGuideOpen(true)}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="flex items-center gap-2">
+                  Paste Formatted Questions (Auto-parsing enabled)
+                  {parsedQuestions.length > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                      ✓ {parsedQuestions.length} Question{parsedQuestions.length !== 1 ? 's' : ''} Ready - Units specified in syntax
+                    </span>
+                  )}
+                  {bulkText.trim() && !parsedQuestions.length && (
+                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium animate-pulse">
+                      Parsing...
+                    </span>
+                  )}
+                </Label>
+                <Textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={14}
+                  className="font-mono text-sm"
+                  placeholder="Paste questions in :::Q::: format (click ? for guide)..."
+                />
+              </div>
+
+              {parsedQuestions.length > 0 && (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  <h3 className="font-semibold text-green-600">📚 Parsed {parsedQuestions.length} Question(s):</h3>
+                  {parsedQuestions.map((q, idx) => {
+                    const unit = q.unitNumber ? content.units[q.unitNumber - 1] : null;
+                    return (
+                      <Card key={idx} className="p-4 border-green-200 bg-white shadow-sm">
+                        {/* Header badges */}
+                        <div className="flex items-center gap-2 mb-3">
+                          {unit ? (
+                            <span className="text-xs font-medium bg-purple-600 text-white px-2 py-0.5 rounded">
+                              Unit {q.unitNumber}: {unit.title}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium bg-gray-600 text-white px-2 py-0.5 rounded">
+                              No Unit
+                            </span>
+                          )}
+                          <Badge className={getDifficultyColor(q.difficulty || 'medium') + ' text-white'}>
+                            {q.difficulty || 'medium'}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {getTypeLabel(q.type || 'multiple-choice')}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs ml-auto">
+                            {q.points || 1} pts
+                          </Badge>
+                        </div>
+
+                        {/* Question text */}
+                        <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="font-medium text-gray-900">{q.question}</p>
+                        </div>
+
+                        {/* MCQ/TF Options */}
+                        {q.options && q.options.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            {q.options.map((option, optIdx) => {
+                              const letter = String.fromCharCode(65 + optIdx); // A, B, C, D
+                              const isCorrect = q.correctAnswer === letter || q.correctAnswer === optIdx.toString();
+                              return (
+                                <div 
+                                  key={optIdx}
+                                  className={`flex items-start gap-2 p-2 rounded border ${
+                                    isCorrect 
+                                      ? 'bg-green-50 border-green-300' 
+                                      : 'bg-gray-50 border-gray-200'
+                                  }`}
+                                >
+                                  <span className="font-mono font-bold text-sm text-gray-600 min-w-[20px]">
+                                    {letter})
+                                  </span>
+                                  <span className="text-sm text-gray-800">{option}</span>
+                                  {isCorrect && (
+                                    <span className="ml-auto text-green-600 text-xs font-semibold">✓ Correct</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* FRQ Answer */}
+                        {q.type === 'free-response' && q.correctAnswer && (
+                          <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                            <p className="text-xs font-semibold text-green-700 mb-1">ANSWER KEY:</p>
+                            <p className="text-sm text-gray-800 line-clamp-3">{q.correctAnswer}</p>
+                          </div>
+                        )}
+
+                        {/* Explanation */}
+                        {q.explanation && (
+                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <p className="text-xs font-semibold text-blue-700 mb-1">EXPLANATION:</p>
+                            <p className="text-sm text-gray-800">{q.explanation}</p>
+                          </div>
+                        )}
+
+                        {/* Tags */}
+                        {q.tags && q.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-3">
+                            {q.tags.map((tag, tagIdx) => (
+                              <Badge key={tagIdx} variant="secondary" className="text-xs">
+                                #{tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                {parsedQuestions.length > 0 && (
+                  <Button 
+                    onClick={handleSaveBulkQuestions}
+                    disabled={isPending}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isPending ? (
+                      <>
+                        <span className="animate-spin mr-2">⏳</span>
+                        Uploading {uploadProgress.current}/{uploadProgress.total}...
+                      </>
+                    ) : (
+                      `Save ${parsedQuestions.length} Question(s)`
+                    )}
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setBulkText('');
+                    setParsedQuestions([]);
+                  }}
+                  disabled={isPending}
+                >
+                  Clear
+                </Button>
+              </div>
+
+              {/* Upload Progress Bar */}
+              {isPending && uploadProgress.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Uploading questions...</span>
+                    <span className="font-semibold text-green-600">
+                      {uploadProgress.current} / {uploadProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-green-500 to-green-600 h-3 transition-all duration-300 ease-out"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    ⚡ Batch uploading for faster performance...
+                  </p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isFormatGuideOpen} onOpenChange={setIsFormatGuideOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Questions Import Format Guide</DialogTitle>
+            </DialogHeader>
+            <pre className="text-xs bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto whitespace-pre-wrap">
+              {QUESTION_FORMAT_GUIDE}
+            </pre>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Batch Actions */}
+      {filteredQuestions.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedQuestions.size === filteredQuestions.length && filteredQuestions.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-medium">
+                  Select All ({selectedQuestions.size}/{filteredQuestions.length})
+                </span>
+              </label>
+            </div>
+
+            {selectedQuestions.size > 0 && (
+              <div className="flex items-center gap-4">
+                {deleteProgress.total > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Deleting {deleteProgress.current}/{deleteProgress.total}...
+                    </span>
+                    <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-red-500 to-rose-600 transition-all duration-300"
+                        style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="border-red-500 text-red-600 hover:bg-red-50"
+                >
+                  {isPending && deleteProgress.total > 0 ? (
+                    <>
+                      <span className="mr-2 inline-block animate-spin">🗑️</span>
+                      Deleting {deleteProgress.current}/{deleteProgress.total}...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected ({selectedQuestions.size})
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Search and Filter Controls */}
+      <Card className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-2">
+            <Label className="text-sm text-gray-600">Search Questions</Label>
+            <Input
+              placeholder="Search by question text or tags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600">Unit</Label>
+            <Select value={filterUnit} onValueChange={setFilterUnit}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {content.units.map(unit => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600">Difficulty</Label>
+            <Select value={filterDifficulty} onValueChange={setFilterDifficulty}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All difficulties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Difficulties</SelectItem>
+                <SelectItem value="easy">Easy</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="hard">Hard</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+          <div>
+            <Label className="text-sm text-gray-600">Type</Label>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+                <SelectItem value="free-response">Free Response</SelectItem>
+                <SelectItem value="true-false">True/False</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchQuery('');
+                setFilterUnit('all');
+                setFilterDifficulty('all');
+                setFilterType('all');
+              }}
+              className="w-full"
+            >
+              Clear Filters
+            </Button>
+          </div>
+          <div className="md:col-span-2 flex items-end justify-end">
+            <p className="text-sm text-gray-600">
+              Showing {filteredQuestions.length} of {allQuestions.length} questions
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Questions List */}
+      <div className="grid gap-4">
+        {filteredQuestions.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-gray-500">
+              {allQuestions.length === 0 
+                ? 'No questions yet. Add your first question!' 
+                : 'No questions match your filters.'}
+            </p>
+          </Card>
+        ) : (
+          filteredQuestions.map((q) => (
+            <Card key={q.id} className="p-4">
+              <div className="flex items-start gap-4">
+                <input
+                  type="checkbox"
+                  checked={selectedQuestions.has(q.id)}
+                  onChange={() => toggleSelectQuestion(q.id)}
+                  className="w-4 h-4 mt-1 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className={getDifficultyColor(q.difficulty)}>
+                      {q.difficulty}
+                    </Badge>
+                    <Badge variant="outline">{getTypeLabel(q.type)}</Badge>
+                    <Badge variant="secondary">{q.points} pts</Badge>
+                    <span className="text-sm text-gray-500">{q.unitTitle}</span>
+                  </div>
+                  <p className="font-medium mb-2">{q.question}</p>
+                  {q.type === 'multiple-choice' && q.options && (
+                    <div className="text-sm text-gray-600 space-y-1">
+                      {q.options.map((opt, idx) => (
+                        <div 
+                          key={idx}
+                          className={idx.toString() === q.correctAnswer ? 'text-green-600 font-medium' : ''}
+                        >
+                          {String.fromCharCode(65 + idx)}) {opt}
+                          {idx.toString() === q.correctAnswer && ' ✓'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {q.explanation && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      <span className="font-medium">Explanation:</span> {q.explanation}
+                    </p>
+                  )}
+                  {q.tags && q.tags.length > 0 && (
+                    <div className="flex gap-1 mt-2">
+                      {q.tags.map((tag, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(q)}
+                    disabled={isPending}
+                    className="hover:bg-blue-50"
+                  >
+                    <Edit className="w-4 h-4 text-blue-500" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteQuestion(q.unitId, q.id)}
+                    disabled={isPending}
+                    className="hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

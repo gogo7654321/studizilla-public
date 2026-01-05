@@ -1,0 +1,985 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-inter), sans-serif;
+}
+
+@layer base {
+  /* Default light theme variables */
+  :root, html[data-theme="default"]:not([data-custom-theme-active="true"]) {
+    --background: 240 20% 8%; /* Dark navy background */
+    --foreground: 220 20% 95%; /* Light text */
+    --card: 240 15% 12%;
+    --card-foreground: 220 20% 95%;
+    --popover: 240 15% 12%;
+    --popover-foreground: 220 20% 95%;
+    --primary: 266 100% 65%; /* Vibrant purple #7c3aed */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 15% 18%;
+    --secondary-foreground: 220 20% 95%;
+    --muted: 240 15% 18%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 266 80% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 59% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 15% 20%;
+    --input: 240 15% 20%;
+    --ring: 266 100% 65%;
+    --radius: 1rem;
+    --chart-1: 266 100% 65%;
+    --chart-2: 280 80% 60%;
+    --chart-3: 330 80% 60%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --sidebar-background: 240 20% 10%;
+    --sidebar-foreground: 220 20% 95%;
+    --sidebar-primary: 266 100% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 15% 18%;
+    --sidebar-accent-foreground: 220 20% 95%;
+    --sidebar-border: 240 15% 20%;
+    --sidebar-ring: 266 100% 65%;
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 210 40% 98%;
+  }
+  
+  /* Default dark theme variables */
+  .dark, html[data-theme="default"].dark:not([data-custom-theme-active="true"]) {
+    --background: 220 49% 10%; /* Dark Blue */
+    --foreground: 210 40% 98%;
+    --card: 220 49% 15%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 49% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 181 29% 42%; /* Teal */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 49% 21%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 49% 21%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 220 49% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 59% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 49% 25%;
+    --input: 220 49% 25%;
+    --ring: 181 29% 42%;
+    --radius: 1rem;
+    --chart-1: 181 29% 42%;
+    --chart-2: 220 49% 21%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    --success: 142.1 70.2% 46.3%;
+    --success-foreground: 210 40% 98%;
+  }
+
+  /* Protanopia (Red-blind) Theme */
+  html[data-theme="protanopia"]:not([data-custom-theme-active="true"]) {
+    --primary: 210 80% 55%;
+    --accent: 39 90% 55%;
+    --destructive: 240 50% 60%;
+    --ring: 210 80% 55%;
+    --chart-1: 210 80% 55%;
+    --chart-2: 39 90% 55%;
+  }
+
+  html[data-theme="protanopia"].dark:not([data-custom-theme-active="true"]) {
+    --primary: 210 80% 55%;
+    --accent: 39 90% 55%;
+    --destructive: 240 50% 50%;
+    --ring: 210 80% 55%;
+    --chart-1: 210 80% 55%;
+    --chart-2: 39 90% 55%;
+  }
+
+  /* Deuteranopia (Green-blind) Theme */
+  html[data-theme="deuteranopia"]:not([data-custom-theme-active="true"]) {
+    --primary: 220 85% 60%;
+    --accent: 260 70% 65%;
+    --destructive: 30 80% 60%;
+    --ring: 220 85% 60%;
+    --chart-1: 220 85% 60%;
+    --chart-2: 260 70% 65%;
+  }
+
+  html[data-theme="deuteranopia"].dark:not([data-custom-theme-active="true"]) {
+    --primary: 220 85% 60%;
+    --accent: 260 70% 65%;
+    --destructive: 30 80% 50%;
+    --ring: 220 85% 60%;
+    --chart-1: 220 85% 60%;
+    --chart-2: 260 70% 65%;
+  }
+  
+  /* Tritanopia (Blue-yellow-blind) Theme */
+  html[data-theme="tritanopia"]:not([data-custom-theme-active="true"]) {
+    --primary: 350 80% 60%;
+    --accent: 180 60% 45%;
+    --destructive: 20 80% 55%;
+    --ring: 350 80% 60%;
+    --chart-1: 350 80% 60%;
+    --chart-2: 180 60% 45%;
+  }
+  html[data-theme="tritanopia"].dark:not([data-custom-theme-active="true"]) {
+    --primary: 350 80% 60%;
+    --accent: 180 60% 45%;
+    --destructive: 20 80% 50%;
+    --ring: 350 80% 60%;
+    --chart-1: 350 80% 60%;
+    --chart-2: 180 60% 45%;
+  }
+
+  /*
+    High-specificity rule for custom themes.
+    This rule is activated by the `data-custom-theme-active` attribute.
+    It maps the standard theme variables to custom variables, which are then
+    set via inline styles on the <html> element for maximum priority.
+  */
+  html[data-custom-theme-active="true"] {
+    --background: var(--custom-background);
+    --foreground: var(--custom-foreground);
+    --card: var(--custom-card);
+    --card-foreground: var(--custom-card-foreground);
+    --popover: var(--custom-popover);
+    --popover-foreground: var(--custom-popover-foreground);
+    --primary: var(--custom-primary);
+    --primary-foreground: var(--custom-primary-foreground);
+    --secondary: var(--custom-secondary);
+    --secondary-foreground: var(--custom-secondary-foreground);
+    --muted: var(--custom-muted);
+    --muted-foreground: var(--custom-muted-foreground);
+    --accent: var(--custom-accent);
+    --accent-foreground: var(--custom-accent-foreground);
+    --destructive: 0 59% 55%; /* Keep destructive colors standard */
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--custom-border);
+    --input: var(--custom-input);
+    --ring: var(--custom-ring);
+    
+    --sidebar-background: var(--custom-secondary);
+    --sidebar-foreground: var(--custom-secondary-foreground);
+    --sidebar-accent: var(--custom-muted);
+    --sidebar-accent-foreground: var(--custom-muted-foreground);
+    --sidebar-border: var(--custom-border);
+    
+    --chart-1: var(--custom-primary);
+    --chart-2: var(--custom-accent);
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  html[data-has-full-background="true"] body main,
+  html[data-has-full-background="true"] body .p-4.md\:p-8 {
+    background: transparent !important;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(0.6);
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    50% {
+      transform: translateY(-5px);
+      opacity: 0.7;
+    }
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  @keyframes shine {
+    from {
+        transform: translateX(-100%) skewX(-30deg);
+    }
+    to {
+        transform: translateX(200%) skewX(-30deg);
+    }
+  }
+
+  @keyframes scan {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+  }
+
+  @keyframes gridMove {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(30px, 30px); }
+  }
+}
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .transform-style-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+  .animate-pulse-dot {
+    animation: pulse-dot 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  /* --- MathQuill Editor Styling --- */
+  .math-input-container .mq-editable-field {
+    font-family: var(--font-inter), sans-serif; /* Set a modern base font */
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    width: 100%;
+  }
+
+  .math-input-container .mq-font,
+  .math-input-container .mq-text-mode .mq-font {
+    font-family: var(--font-inter), sans-serif;
+    font-style: normal;
+  }
+
+  .math-input-container .mq-font.mq-non-leaf {
+    font-family: 'Symbola_mq', 'Times New Roman', serif;
+  }
+
+  /* --- Specific styling for letters --- */
+  .math-input-container var {
+    font-family: var(--font-inter), sans-serif !important;
+    font-style: normal !important;
+    font-weight: 500;
+  }
+
+  .math-input-container .mq-cursor {
+    border-left: 2px solid hsl(var(--primary));
+    animation: blink 1s step-end infinite;
+  }
+
+  /* Hide the default placeholder-like text */
+  .math-input-container .mq-editable-field.mq-empty:before {
+    content: '';
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* --- Animated Gradient Text for Deck Hover --- */
+  .animated-gradient-text {
+    position: relative;
+    display: inline-block;
+    color: inherit;
+  }
+
+  .animated-gradient-text::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    background-image: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .group:hover .animated-gradient-text::after {
+    width: 100%;
+  }
+
+  .copyright-symbol {
+    @apply text-[0.6em] font-normal align-super -top-0.5 relative ml-px;
+  }
+
+  /* --- Starry Night Animations --- */
+  .starry-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .shooting-star-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999; /* On top of everything */
+    pointer-events: none; /* Allow clicks to pass through */
+    overflow: hidden;
+  }
+
+  @keyframes twinkle1 {
+    0%, 100% { box-shadow: 0 0 8px 2px hsl(var(--custom-star-color) / 0.8); }
+    50% { box-shadow: 0 0 2px 0px hsl(var(--custom-star-color) / 0.2); }
+  }
+  @keyframes twinkle2 {
+    0%, 100% { box-shadow: 0 0 8px 2px hsl(var(--custom-star-color) / 0.8); }
+    30% { box-shadow: 0 0 2px 0px hsl(var(--custom-star-color) / 0.2); }
+    70% { box-shadow: 0 0 2px 0px hsl(var(--custom-star-color) / 0.2); }
+  }
+  @keyframes twinkle3 {
+    0%, 100% { box-shadow: 0 0 2px 0px hsl(var(--custom-star-color) / 0.2); }
+    50% { box-shadow: 0 0 8px 2px hsl(var(--custom-star-color) / 0.8); }
+  }
+  @keyframes twinkle4 {
+     0%, 100% { box-shadow: 0 0 2px 0px hsl(var(--custom-star-color) / 0.2); }
+    20% { box-shadow: 0 0 8px 2px hsl(var(--custom-star-color) / 0.8); }
+    80% { box-shadow: 0 0 8px 2px hsl(var(--custom-star-color) / 0.8); }
+  }
+
+  .shootingstar {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: hsl(var(--custom-star-color));
+    border-radius: 50%;
+    animation-name: animate;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    left: initial;
+  }
+  .shootingstar::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 300px;
+    height: 1px;
+    background: linear-gradient(90deg, hsl(var(--custom-star-color)), transparent);
+  }
+  
+  @keyframes animate {
+    0% { transform: rotate(315deg) translateX(0); opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: rotate(315deg) translateX(-1500px); opacity: 0; }
+  }
+
+  /* --- Sakura Drift Animations --- */
+  .sakura-background {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  .sakura-petal {
+    position: absolute;
+    top: -20px;
+    background-color: hsl(var(--custom-primary));
+    border-radius: 70% 30% 70% 30% / 60% 40% 60% 40%;
+    opacity: 0.8;
+    filter: blur(0.5px);
+    will-change: transform, opacity;
+    animation-iteration-count: infinite;
+  }
+  
+  @keyframes fall-0 {
+    0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 0.9; }
+    100% { transform: translateY(110vh) translateX(-5vw) rotate(360deg); opacity: 0; }
+  }
+  
+  @keyframes fall-1 {
+    0% { transform: translateY(-10vh) translateX(0) rotate(120deg); opacity: 1; }
+    100% { transform: translateY(110vh) translateX(5vw) rotate(-360deg); opacity: 0; }
+  }
+  
+  @keyframes fall-2 {
+    0% { transform: translateY(-10vh) translateX(0) rotate(-120deg); opacity: 0.8; }
+    100% { transform: translateY(110vh) translateX(2vw) rotate(180deg); opacity: 0; }
+  }
+
+  /* --- Tidal Bloom Animations --- */
+  .tidal-bloom-bg {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: -1;
+    background: linear-gradient(to bottom, #a8edea 0%, #f7d794 100%);
+  }
+  .wave-layer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100px; /* Base height */
+    background: linear-gradient(to top, hsla(187, 38%, 86%, 0.4), hsla(187, 38%, 86%, 0));
+    animation-name: waveWash;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .wave1 {
+    animation-duration: 10s;
+    animation-delay: 0s;
+    opacity: 0.7;
+  }
+  .wave2 {
+    animation-duration: 12s;
+    animation-delay: -5s;
+    opacity: 0.5;
+  }
+  .wave3 {
+    animation-duration: 15s;
+    animation-delay: -2s;
+    opacity: 0.3;
+  }
+  @keyframes waveWash {
+    0% {
+      transform: translateY(10%);
+      height: 100px;
+    }
+    50% {
+      transform: translateY(-20%);
+      height: 150px;
+    }
+    100% {
+      transform: translateY(10%);
+      height: 100px;
+    }
+  }
+
+  .tidal-bubble-container {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  .tidal-bubble {
+    position: absolute;
+    bottom: -20px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    animation-name: floatUp;
+    animation-timing-function: ease-in;
+    animation-iteration-count: infinite;
+  }
+  @keyframes floatUp {
+    0% {
+      transform: translateY(0) scale(1);
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-120vh) scale(1.2);
+      opacity: 0;
+    }
+  }
+
+  /* --- Forest Haze Animations --- */
+  .forest-haze-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(to bottom, #0b2e22, #051912);
+    overflow: hidden;
+  }
+
+  .mist-layer {
+    position: absolute;
+    top: 0;
+    width: 200%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05), transparent 70%);
+    opacity: 0.3;
+    animation-name: mistDrift;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .mist-layer.left {
+    left: -100%;
+    animation-direction: normal;
+  }
+
+  .mist-layer.right {
+    left: -100%;
+    animation-direction: reverse;
+  }
+
+  @keyframes mistDrift {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* Agent Tag Gradient */
+  .agent-tag-gradient {
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-fill-color: transparent;
+  }
+
+  .break-inside-avoid-column {
+    break-inside: avoid;
+  }
+
+  /* --- AUTH PAGE INFINITE SCROLL --- */
+  @keyframes marquee {
+    from { transform: translateY(0); }
+    to { transform: translateY(-50%); }
+  }
+  
+  .animate-marquee {
+    animation: marquee 60s linear infinite;
+  }
+  
+  .marquee-reverse {
+    animation-direction: reverse;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
+  }
+
+  .auth-testimonial-card {
+    @apply mb-6;
+    @apply bg-card border border-border;
+    @apply dark:bg-white/5 dark:border-white/10 dark:backdrop-blur-lg;
+  }
+
+  /* --- Button Shine Animation --- */
+  .shine-effect::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: translateX(-150%) skewX(-30deg);
+    transition: transform 0.75s ease;
+  }
+
+  .shine-effect:hover::before {
+    transform: translateX(250%) skewX(-30deg);
+  }
+
+  /* CHAT BUBBLE FIX */
+  .prose ul, .prose ol {
+    @apply my-2;
+  }
+  .prose li {
+    @apply my-1;
+  }
+  .prose li > p {
+    @apply my-0;
+  }
+}
+
+/* --- FULL BACKGROUND THEME OVERRIDES --- */
+html[data-custom-theme-active="true"] {
+    --sidebar-background: var(--custom-secondary) !important;
+    --sidebar-foreground: var(--custom-secondary-foreground) !important;
+    --sidebar-accent: var(--custom-muted) !important;
+    --sidebar-accent-foreground: var(--custom-muted-foreground) !important;
+    --sidebar-border: var(--custom-border) !important;
+}
+
+/* Default full-screen background (gradient for Starry Night variants) */
+html[data-has-full-background="true"] body {
+  background-image: linear-gradient(135deg, hsl(var(--custom-primary-gradient-start)), hsl(var(--custom-primary-gradient-end))) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-color: hsl(var(--custom-background)) !important; /* Fallback color */
+}
+
+/* Specific background for FC Barcelona theme */
+html[data-has-full-background="true"][data-theme-id="fc-barcelona"] body {
+  --foreground: 210 40% 98% !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  background: 
+    repeating-linear-gradient(
+      90deg, 
+      #A50044, /* Garnet */
+      #A50044 100px, 
+      #004D98 100px, /* Blue */
+      #004D98 200px
+    ) !important;
+}
+
+/* Correct rule for starry night text color */
+html[data-has-full-background="true"][data-theme-id="starry-night"] body {
+  --foreground: 210 40% 98% !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Specific background for Catpuccin theme */
+html[data-has-full-background="true"][data-theme-id="catpuccin"] body {
+  --foreground: 228 33% 92% !important; /* Enforce light text color */
+  background-image: url('/images/theme/catpuccin.png') !important;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* Specific background for Midnight Office theme */
+html[data-has-full-background="true"][data-theme-id="midnight-office"] body {
+  background-color: #0c2434 !important;
+  background-image: url('/images/theme/living_room.gif') !important;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* Specific background for Parisian Daydream theme */
+html[data-has-full-background="true"][data-theme-id="parisian-daydream"] body {
+  background-color: #fdeef1 !important;
+}
+
+/* Specific background for Pastel Soft theme */
+html[data-has-full-background="true"][data-theme-id="pastel-soft"] body {
+  background-color: hsl(var(--custom-background)) !important;
+}
+
+/* Specific background for Tidal Bloom theme */
+html[data-has-full-background="true"][data-theme-id="tidal-bloom"] body {
+  background: transparent !important;
+}
+
+html[data-has-full-background="true"] [data-sidebar-inset] {
+  background-color: transparent !important;
+}
+
+html[data-has-full-background="true"] footer {
+  background-color: transparent !important;
+}
+
+
+/* --- Glassmorphism rules for all full-background themes --- */
+html[data-glassmorphism-enabled="true"] .grid-card-wrapper > *,
+html[data-glassmorphism-enabled="true"] [role="tablist"] {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--custom-card) / 0.65) 0%,
+    hsl(var(--custom-card) / 0.45) 100%
+  ) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid hsl(var(--custom-border) / 0.2) !important;
+  box-shadow: 
+    0 8px 32px 0 hsl(var(--custom-foreground) / 0.1),
+    inset 0 1px 0 0 hsl(var(--custom-foreground) / 0.1),
+    0 1px 2px 0 hsl(var(--custom-foreground) / 0.05) !important;
+}
+
+html[data-glassmorphism-enabled="true"] .grid-card-wrapper > * > * {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+html[data-glassmorphism-enabled="true"] .solid-popover,
+html[data-glassmorphism-enabled="true"] .solid-dialog,
+html[data-glassmorphism-enabled="true"] .music-player-dialog {
+  background-color: hsl(var(--custom-card) / 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: hsl(var(--custom-border) / 0.4) !important;
+  box-shadow: 0 8px 32px 0 hsl(var(--custom-foreground) / 0.15) !important;
+}
+
+html[data-glassmorphism-enabled="true"] [data-sidebar="sidebar"] {
+    background: linear-gradient(
+        135deg,
+        hsl(var(--custom-card) / 0.35) 0%,
+        hsl(var(--custom-card) / 0.25) 100%
+    ) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid hsl(var(--custom-border) / 0.15) !important;
+    box-shadow: 
+        0 8px 32px 0 hsl(var(--custom-foreground) / 0.08),
+        inset 0 1px 0 0 hsl(var(--custom-foreground) / 0.1) !important;
+}
+
+/* Apply nested glass effect to specific components inside widgets */
+html[data-glassmorphism-enabled="true"] .grid-card-wrapper .bg-secondary,
+html[data-glassmorphism-enabled="true"] .grid-card-wrapper .bg-muted,
+html[data-glassmorphism-enabled="true"] .grid-card-wrapper .border {
+  background-color: hsl(var(--custom-card) / 0.1) !important;
+  border-color: hsl(var(--custom-border) / 0.15) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+/* --- Solid Background Sidebar for Full-Screen Themes (Glass OFF) --- */
+html[data-has-full-background="true"]:not([data-glassmorphism-enabled="true"]) [data-sidebar="sidebar"] {
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-width: 1px;
+  border-color: hsl(var(--border) / 0.3) !important;
+}
+
+html[data-has-full-background="true"] .shadow-lg {
+  box-shadow: none !important;
+}
+
+html[data-has-full-background="true"] .backdrop-blur-xl {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-has-full-background="true"] [role="tablist"] > [role="tab"][data-state="active"] {
+  background-color: hsl(var(--custom-accent) / 0.3) !important;
+  box-shadow: none !important;
+  color: hsl(var(--custom-primary)) !important;
+}
+
+/* Make Sidebar buttons have a subtle background on hover */
+html[data-has-full-background="true"] [data-sidebar='sidebar'] [data-sidebar='menu-button']:hover {
+  background-color: hsl(var(--custom-accent) / 0.3) !important;
+  color: hsl(var(--custom-primary)) !important;
+}
+
+html[data-has-full-background="true"] [data-sidebar='sidebar'] [data-sidebar='menu-button'][data-active='true'] {
+  background-color: hsl(var(--custom-accent) / 0.2) !important;
+  color: hsl(var(--custom-primary)) !important;
+  font-weight: 600 !important;
+}
+
+/* --- Theme-specific Overrides & Fixes --- */
+html[data-has-full-background="true"]:not([data-theme-id="pastel-soft"]):not([data-theme-id="tidal-bloom"]) .dashboard-header-container p,
+html[data-has-full-background="true"]:not([data-theme-id="pastel-soft"]):not([data-theme-id="tidal-bloom"]) .dashboard-header-container h1 {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+html[data-has-full-background="true"] .dashboard-customizer-sheet,
+html[data-has-full-background="true"] .settings-dialog-content {
+  background-color: hsl(var(--custom-background)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: hsl(var(--custom-border)) !important;
+}
+
+/* Ensure readability for the Parisian Daydream theme header */
+html[data-has-full-background="true"][data-theme-id="parisian-daydream"] .dashboard-header-container .text-foreground,
+html[data-has-full-background="true"][data-theme-id="tidal-bloom"] .dashboard-header-container .text-foreground {
+    color: #0d2c4f !important; /* Deep, dark navy blue for max contrast */
+    text-shadow: 0 2px 6px rgba(255, 255, 255, 0.3) !important; /* Soft white glow for separation */
+}
+html[data-has-full-background="true"][data-theme-id="parisian-daydream"] .dashboard-header-container .text-muted-foreground,
+html[data-has-full-background="true"][data-theme-id="tidal-bloom"] .dashboard-header-container .text-muted-foreground {
+    color: #2c3e50 !important; /* A readable, lighter slate blue */
+    text-shadow: 0 2px 6px rgba(255, 255, 255, 0.3) !important; /* Matching soft glow */
+}
+
+/* --- DEV PORTAL THEME --- */
+.dev-portal-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: 
+    radial-gradient(ellipse at top, rgba(239, 68, 68, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    #000;
+  overflow: hidden;
+}
+
+.scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 50%,
+    rgba(6, 182, 212, 0.02) 51%,
+    rgba(255, 255, 255, 0) 52%
+  );
+  background-size: 100% 3px;
+  animation: scan 8s linear infinite;
+  pointer-events: none;
+}
+
+html[data-theme-id="dev-portal"] .dev-portal-scope {
+  --background: 220 15% 6%;
+  --foreground: 210 20% 92%;
+  --card: 220 15% 8%;
+  --card-foreground: 210 20% 92%;
+  --popover: 220 15% 6%;
+  --popover-foreground: 210 20% 92%;
+  --primary: 6 100% 65%;
+  --primary-foreground: 220 15% 6%;
+  --secondary: 220 15% 12%;
+  --secondary-foreground: 210 20% 92%;
+  --muted: 220 10% 18%;
+  --muted-foreground: 210 10% 55%;
+  --accent: 6 85% 60%;
+  --accent-foreground: 220 15% 6%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 20% 18%;
+  --input: 220 15% 12%;
+  --ring: 6 100% 60%;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+/* Subtle grid pattern */
+html[data-theme-id="dev-portal"] .dev-portal-scope::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+html[data-theme-id="dev-portal"] .dev-portal-scope .bg-card {
+  background: linear-gradient(145deg, hsl(var(--card)) 0%, hsl(220 15% 10%) 100%);
+  border: 1px solid hsl(var(--border));
+  box-shadow: 
+    0 0 20px rgba(6, 182, 212, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* This is a new rule added to ensure the new player is not translucent. */
+.player-window {
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/*
+  New rules to override glassmorphism for specific popup components.
+  These have high specificity to ensure they apply over the theme styles.
+*/
+html[data-has-full-background="true"] .solid-popover,
+html[data-has-full-background="true"] .solid-dialog,
+html[data-has-full-background="true"] .music-player-dialog {
+  background-color: hsl(var(--custom-card) / 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: hsl(var(--custom-border) / 0.4) !important;
+  box-shadow: 0 8px 32px 0 hsl(var(--custom-foreground) / 0.15) !important;
+}
+
+html[data-has-full-background="true"] .solid-dialog {
+    background-color: hsl(var(--background)) !important;
+}
+
+/* --- MathQuill Editor Styling --- */
+.math-input-container .mq-editable-field {
+  font-family: var(--font-inter), sans-serif; /* Set a modern base font */
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: 100%;
+}
+
+.math-input-container .mq-font,
+.math-input-container .mq-text-mode .mq-font {
+  font-family: var(--font-inter), sans-serif;
+  font-style: normal;
+}
+
+.math-input-container .mq-font.mq-non-leaf {
+  font-family: 'Symbola_mq', 'Times New Roman', serif;
+}
+
+/* --- Specific styling for letters --- */
+.math-input-container var {
+  font-family: var(--font-inter), sans-serif !important;
+  font-style: normal !important;
+  font-weight: 500;
+}
+
+.math-input-container .mq-cursor {
+  border-left: 2px solid hsl(var(--primary));
+  animation: blink 1s step-end infinite;
+}
+
+/* Hide the default placeholder-like text */
+.math-input-container .mq-editable-field.mq-empty:before {
+  content: '';
+}
+
+@media screen and (max-width: 767px) {
+    .auth-testimonials-col {
+        display: none !important;
+    }
+    .auth-center-col {
+        left: 0 !important;
+        right: 0 !important;
+    }
+}

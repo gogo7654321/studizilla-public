@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isDev() {
+      // Check if the user is a developer based on their email.
+      return request.auth != null && request.auth.token.email in [
+        'epikmathdev@gmail.com',
+        'npatel012010@gmail.com',
+        'artval4games@gmail.com'
+      ];
+    }
+    
+    function isOwner(userId) {
+      // Check if the authenticated user's ID matches the provided userId.
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Default read access for all files.
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    // Allow developers to upload to the course-materials folder.
+    match /course-materials/{courseId}/{fileName} {
+      allow write: if isDev();
+    }
+    
+    // Allow users to upload attachments to their own support chats, and allow devs to upload to any.
+    match /support-attachments/{userId}/{fileName} {
+        allow write: if isOwner(userId) || isDev();
+    }
+
+    // Secure and debug avatar uploads.
+    // Allow write only if the user is the owner of the directory or a developer.
+    match /avatars/{userId}/{fileName} {
+      allow write: if debug({
+        'rule_name': 'avatar_upload',
+        'is_authenticated': request.auth != null,
+        'authenticated_uid': request.auth.uid,
+        'path_userId': userId,
+        'is_owner_check': isOwner(userId),
+        'is_dev_check': isDev()
+      }, isOwner(userId) || isDev());
+    }
+  }
+}

@@ -1,0 +1,145 @@
+/* --- GLOBAL HOMEPAGE STYLES --- */
+.homepage-container {
+    @apply bg-background text-foreground;
+}
+
+.homepage-section-title {
+    @apply text-3xl md:text-5xl font-bold font-headline text-center;
+}
+
+.homepage-subtitle {
+    @apply mt-4 text-lg text-muted-foreground text-center;
+}
+
+/* --- HERO SECTION --- */
+.homepage-hero {
+    @apply relative py-20 md:py-32 overflow-hidden text-center;
+}
+.homepage-hero-content {
+    @apply container relative z-10 flex flex-col items-center mx-auto;
+}
+.homepage-title {
+    @apply text-5xl font-extrabold tracking-tight sm:text-6xl md:text-8xl bg-gradient-to-r from-primary via-accent to-primary text-transparent bg-clip-text;
+    -webkit-background-clip: text;
+}
+.homepage-buttons {
+    @apply mt-10 flex flex-wrap items-center justify-center gap-4;
+}
+
+/* --- FEATURE SHOWCASE SECTION --- */
+.feature-showcase-card {
+    @apply rounded-2xl border bg-card/50 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+}
+
+.mock-ui {
+    @apply p-4 border bg-secondary/30 rounded-lg;
+}
+
+/* --- REVIEWS SECTION --- */
+.reviews-section {
+    @apply py-16 sm:py-24 bg-secondary/50;
+}
+.section-header {
+    @apply text-center mb-12;
+}
+.reviews-grid {
+    @apply relative columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4;
+}
+.review-card {
+    @apply mb-6 p-6 bg-card rounded-2xl shadow-md break-inside-avoid-column border;
+}
+.review-header {
+    @apply flex items-start gap-4;
+}
+.review-author-image {
+    @apply h-12 w-12 rounded-full overflow-hidden shrink-0 bg-secondary;
+}
+.review-author-avatar {
+    @apply h-full w-full object-cover;
+}
+.review-author-info {
+    @apply flex-1;
+}
+.review-author-name {
+    @apply font-bold;
+}
+.review-author-location {
+    @apply text-sm text-muted-foreground;
+}
+.review-title {
+    @apply font-semibold mt-4;
+}
+.review-text {
+    @apply text-muted-foreground mt-1;
+}
+.review-badges {
+    @apply mt-4 flex flex-wrap gap-2;
+}
+
+/* Base styles for all gradient badges */
+.gradient-badge {
+    @apply text-xs font-bold px-3 py-1 rounded-full text-white;
+    background-size: 200% auto;
+    transition: background-position 0.5s ease;
+}
+
+.gradient-badge:hover {
+    background-position: right center;
+}
+
+/* Specific gradients for each badge type */
+.og-badge {
+    background-image: linear-gradient(to right, #f59e0b, #fbbf24, #f59e0b);
+}
+.most-improved-badge {
+    background-image: linear-gradient(to right, #22c55e, #4ade80, #22c55e);
+}
+.special-tag-badge {
+    background-image: linear-gradient(to right, #6366f1, #818cf8, #6366f1);
+}
+
+.dark .og-badge { background-image: linear-gradient(to right, #d97706, #f59e0b, #d97706); }
+.dark .most-improved-badge { background-image: linear-gradient(to right, #16a34a, #22c55e, #16a34a); }
+.dark .special-tag-badge { background-image: linear-gradient(to right, #4f46e5, #6366f1, #4f46e5); }
+
+
+/* --- FAQ Section (if you have one) --- */
+.faq-section {
+    @apply py-16 sm:py-24;
+}
+
+/* --- FINAL CTA --- */
+.homepage-cta {
+    @apply bg-gradient-to-r from-primary to-accent py-20 text-center;
+}
+.homepage-cta-content {
+    @apply container flex flex-col items-center mx-auto; /* Centering content */
+}
+.homepage-cta-content h2 {
+    @apply text-4xl font-bold text-primary-foreground;
+}
+.homepage-cta-content p {
+    @apply mt-4 text-lg text-primary-foreground/80 max-w-xl mx-auto;
+}
+
+/* --- MOBILE OPTIMIZATION --- */
+@media (max-width: 768px) {
+    .homepage-section-title {
+        @apply text-3xl;
+    }
+    .homepage-subtitle {
+        @apply text-base px-2;
+    }
+    .homepage-title {
+        @apply text-4xl;
+    }
+    .homepage-hero {
+        @apply py-16;
+    }
+    .reviews-grid {
+        @apply sm:columns-1;
+    }
+    .feature-showcase-card {
+        @apply lg:col-span-1; /* Stack cards on mobile */
+    }
+}

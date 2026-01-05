@@ -1,0 +1,15 @@
+
+# Create the file
+nano test_gemini.sh
+
+# Paste ALL the script content, then:
+# Press Ctrl+X, then Y, then Enter to save
+
+# Make it executable
+chmod +x test_gemini.sh
+
+# Run it
+./test_gemini.sh YOUR_API_KEY
+^x
+x
+
